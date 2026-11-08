@@ -1,5 +1,7 @@
 """Disposable local Rust preview QA. No live service, mail or real credential input."""
 import os
+import hashlib
+import json
 from pathlib import Path
 import re
 import signal
@@ -9,6 +11,7 @@ import time
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
+BRAND = {item['path']: item['sha256'] for item in json.loads((ROOT / 'branding.lock.json').read_text())['files']}
 ARTIFACTS = ROOT / '.runtime' / 'browser'
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 with socket.socket() as sock:
@@ -25,6 +28,7 @@ try:
             token = match.group(1)
             break
     assert token, 'Disposable preview token was not issued'
+    bob = re.search(r'preview-bob: ([A-Za-z0-9_-]+)', process.stdout.readline()).group(1)
     with sync_playwright() as p:
         options = {'headless': True}
         if os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE'):
@@ -40,6 +44,19 @@ try:
             assert page.locator('header .brand img').evaluate('(image) => image.complete && image.naturalWidth > 0')
             assert page.locator('header .brand img').evaluate('(image) => image.currentSrc').endswith(f'entropy-lockup-{scheme}.svg')
             assert page.locator('link[rel=icon][type="image/svg+xml"]').get_attribute('href') == '/brand/favicon.svg'
+            for asset in ('favicon.svg', 'favicon.png', 'favicon.ico', 'entropy-mark-512.png'):
+                response = page.request.get(f'http://127.0.0.1:{port}/brand/{asset}')
+                assert response.status == 200
+                assert hashlib.sha256(response.body()).hexdigest() == BRAND['static/brand/' + asset]
+            alpha = page.evaluate("""() => new Promise((resolve,reject) => {
+              const image = new Image(); image.onerror = reject;
+              image.onload = () => {const canvas = document.createElement('canvas');
+                canvas.width = image.width; canvas.height = image.height;
+                const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+                resolve({width:image.width, height:image.height, corner:ctx.getImageData(0,0,1,1).data[3]});};
+              image.src = '/brand/favicon.png';
+            })""")
+            assert alpha == {'width': 32, 'height': 32, 'corner': 0}
             page.locator('#token').fill(token)
             page.get_by_role('button', name='Connect', exact=True).click()
             page.locator('#dashboard').wait_for(state='visible')
@@ -108,8 +125,71 @@ try:
         expect(page.locator('#output-status')).to_contain_text('unexpected response (503)')
         assert len(requests) == 1
         context.close()
+        # Pending work belongs to its original session, even if a transport ignores abort.
+        context = browser.new_context()
+        page = context.new_page()
+        page.add_init_script('window.setInterval = fn => {window.fixturePoll = fn; return 1}')
+        page.goto(f'http://127.0.0.1:{port}/')
+        page.locator('#token').fill(token)
+        page.get_by_role('button', name='Connect', exact=True).click()
+        page.locator('#dashboard').wait_for(state='visible')
+        # An older status response cannot roll the dashboard back.
+        page.evaluate("""() => {
+          window.fixtureFetch = fetch; window.statusSequence = 0; window.pendingStatus = [];
+          window.fetch = async (...args) => {
+            const id = ++window.statusSequence;
+            const response = await window.fixtureFetch(...args);
+            const body = await response.json(); body.produced = 200 + id;
+            return new Promise(resolve => {window.pendingStatus[id - 1] = () => resolve(new Response(JSON.stringify(body), {status: 200, headers: {'Content-Type':'application/json'}}));});
+          };
+          window.fixturePoll(); window.fixturePoll();
+        }""")
+        page.wait_for_function('() => typeof pendingStatus[0] === "function" && typeof pendingStatus[1] === "function"')
+        page.evaluate('pendingStatus[1]()')
+        expect(page.locator('#produced')).to_have_text('202')
+        page.evaluate('pendingStatus[0]()')
+        page.wait_for_timeout(100)
+        expect(page.locator('#produced')).to_have_text('202')
+        page.evaluate('window.fetch = window.fixtureFetch')
+        page.evaluate("""() => {
+          const real = fetch; window.pendingAllocations = [];
+          window.fetch = async (...args) => {
+            const response = await real(...args);
+            if (String(args[0]).endsWith('/bytes')) await new Promise(resolve => window.pendingAllocations.push(resolve));
+            return response;
+          };
+        }""")
+        page.locator('#consume').click()
+        page.wait_for_function('() => pendingAllocations.length === 1')
+        page.locator('#disconnect').click()
+        page.locator('#token').fill(bob)
+        page.get_by_role('button', name='Connect', exact=True).click()
+        page.locator('#dashboard').wait_for(state='visible')
+        expect(page.locator('#client-name')).to_have_text('preview-bob')
+        expect(page.locator('#consume')).to_be_enabled(timeout=1000)
+        page.locator('#consume').click()
+        page.wait_for_function('() => pendingAllocations.length === 2')
+        page.evaluate('pendingAllocations[0]()')
+        page.wait_for_timeout(100)
+        expect(page.locator('#consume')).to_be_disabled()
+        expect(page.locator('#output')).to_have_text('No output allocated.')
+        page.evaluate('pendingAllocations[1]()')
+        expect(page.locator('#output-status')).to_contain_text('preview-bob')
+        expect(page.locator('#consume')).to_be_enabled()
+        # A stale poll error cannot replace the disconnected status.
+        page.evaluate("""() => {
+          window.fetch = () => new Promise((resolve, reject) => window.rejectStatus = reject);
+          window.fixturePoll();
+        }""")
+        page.wait_for_function('() => typeof rejectStatus === "function"')
+        page.locator('#disconnect').click()
+        page.evaluate('rejectStatus(new Error("fictional transport failure"))')
+        page.wait_for_timeout(100)
+        expect(page.locator('#connection-status')).to_contain_text('Disconnected.')
+        assert page.locator('#dashboard').is_hidden()
+        context.close()
         browser.close()
-    print('Browser QA passed: desktop/mobile/small, both themes, allocation, disconnect, late response, no overflow or persistent token storage.')
+    print('Browser QA passed: desktop/mobile/small, both themes, canonical logo/favicon bytes, allocation, session replacement, ordered status, late failures, no overflow or persistent token storage.')
 finally:
     process.send_signal(signal.SIGTERM)
     try:

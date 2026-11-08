@@ -1,20 +1,35 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
-let token = '', busy = false, generation = 0, outputGeneration = 0;
+let token = '', busy = false, generation = 0, outputGeneration = 0, statusGeneration = 0;
+const requests = new Set();
+function cancelRequests() {
+  for (const request of requests) request.abort();
+  requests.clear();
+}
 async function api(path, options = {}) {
-  const response = await fetch('/api/v1/' + path, {cache: 'no-store', ...options,
-    headers: {'Authorization': 'Bearer ' + token, ...(options.body ? {'Content-Type':'application/json'} : {})}});
-  let body;
-  try { body = await response.json(); }
-  catch { throw new Error(`The local server returned an unexpected response (${response.status}). No allocation was retried.`); }
-  if (!response.ok) throw new Error(body.error?.message || `Request failed (${response.status}).`);
-  return body;
+  const controller = new AbortController();
+  requests.add(controller);
+  try {
+    const response = await fetch('/api/v1/' + path, {cache: 'no-store', ...options, signal: controller.signal,
+      headers: {'Authorization': 'Bearer ' + token, ...(options.body ? {'Content-Type':'application/json'} : {})}});
+    let body;
+    try { body = await response.json(); }
+    catch { throw new Error(`The local server returned an unexpected response (${response.status}). No allocation was retried.`); }
+    if (!response.ok) throw new Error(body.error?.message || `Request failed (${response.status}).`);
+    return body;
+  } finally { requests.delete(controller); }
 }
 async function refresh() {
   if (!token || document.hidden) return;
   const current = generation;
-  const status = await api('status');
-  if (current !== generation || !token) return;
+  const request = ++statusGeneration;
+  let status;
+  try { status = await api('status'); }
+  catch (error) {
+    if (current !== generation || request !== statusGeneration || !token) return;
+    throw error;
+  }
+  if (current !== generation || request !== statusGeneration || !token) return;
   $('#client-name').textContent = status.client;
   $('#mode').textContent = status.mode === 'os-backed' ? 'OS-backed mode' : 'Experimental · unassessed';
   $('#queued').textContent = status.queued;
@@ -53,15 +68,21 @@ $('#connect-form').addEventListener('submit', async event => {
   const button = event.currentTarget.querySelector('button');
   button.disabled = true;
   generation++;
+  const current = generation;
+  cancelRequests();
+  busy = false;
   token = $('#token').value.trim();
   $('#token').value = '';
   try { await refresh(); }
-  catch (error) { token = ''; $('#connection-status').textContent = error.message; }
-  finally { button.disabled = false; }
+  catch (error) { if (current === generation) { token = ''; $('#connection-status').textContent = error.message; } }
+  finally { if (current === generation) button.disabled = false; }
 });
 $('#disconnect').addEventListener('click', () => {
   generation++;
   outputGeneration++;
+  statusGeneration++;
+  cancelRequests();
+  busy = false;
   token = '';
   $('#context').value = '';
   $('#output-status').textContent = '';
@@ -88,8 +109,8 @@ $('#consume').addEventListener('click', async () => {
     $('#output-status').textContent = `${result.client} · allocation ${block.sequence} · ${block.bytes} bytes`;
   } catch (error) { if (current === generation && display === outputGeneration && token) $('#output-status').textContent = error.message; }
   finally {
-    busy = false;
     if (current !== generation || !token) return;
+    busy = false;
     try { await refresh(); } catch { $('#connection-status').textContent = 'Connection unavailable. No allocation is retried automatically.'; }
   }
 });

@@ -62,6 +62,11 @@
       "source": "LICENSE",
       "path": "static/ARTWORK-LICENSE",
       "sha256": "f5d14c8bdb8bc2c356764d91c4e8abd0ad7cf5091f7ee0869bc35b54957c1ff9"
+    },
+    {
+      "source": "icons/entropy/entropy-512.png",
+      "path": "static/brand/entropy-mark-512.png",
+      "sha256": "353df46d275e7f3df842cdc82ca93ef9e70e4b97e817188b4edab6a0c845220e"
     }
   ]
 }

@@ -1,11 +1,13 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
-let token = '', busy = false, generation = 0;
+let token = '', busy = false, generation = 0, outputGeneration = 0;
 async function api(path, options = {}) {
   const response = await fetch('/api/v1/' + path, {cache: 'no-store', ...options,
     headers: {'Authorization': 'Bearer ' + token, ...(options.body ? {'Content-Type':'application/json'} : {})}});
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error?.message || 'Request failed');
+  let body;
+  try { body = await response.json(); }
+  catch { throw new Error(`The local server returned an unexpected response (${response.status}). No allocation was retried.`); }
+  if (!response.ok) throw new Error(body.error?.message || `Request failed (${response.status}).`);
   return body;
 }
 async function refresh() {
@@ -22,13 +24,24 @@ async function refresh() {
   $('#counter-source').textContent = status.counter_source === 'linux-proc-net-dev'
     ? 'This instance uses bounded host counters from /proc/net/dev. They add no claimed entropy.'
     : 'This instance uses fictional counters. No host traffic is read.';
+  const source = status.source_status;
+  const video = source?.kind === 'public-video';
+  $('#pixel-source').textContent = video
+    ? `Configured for ${source.geometry[0]} × ${source.geometry[1]} RGB frames from the administrator’s public video source. No entropy estimate is assigned.`
+    : 'A predictable 16 × 16 RGB fixture. No live stream is connected.';
+  const sourceStates = {idle:'Waiting to start', connecting:'Connecting', running:'Running', backpressure:'Pool full · input paused', retrying:'Reconnecting within the retry budget', restarting:'Renewing the bounded decoder session', failed:'Source failed · allocations blocked', stopped:'Stopped'};
+  const sourceErrors = {'video-configuration':'The source or decoder configuration was rejected.', 'video-network':'The media source could not be reached.', 'video-input-limit':'The encoded input byte limit was reached.', 'decoder-start':'The configured decoder could not start.', 'video-ended':'The media stream ended.', 'frame-truncated':'The decoder returned an incomplete frame.', 'frame-timeout':'No complete frame arrived before the deadline.', 'decoder-cleanup':'Decoder cleanup did not complete; further starts are blocked.', 'engine-failure':'The engine rejected the generation.'};
+  $('#source-state').textContent = `${video ? 'Public video' : 'Synthetic input'} · ${sourceStates[source?.state] || 'Status unavailable'}${source?.last_error ? '. ' + (sourceErrors[source.last_error] || 'Inspect the local source configuration.') : ''}`;
+  $('#source-state').classList.toggle('source-failed', Boolean(status.producer_fault));
   $('#pool-fill').max = status.capacity;
   $('#pool-fill').value = status.queued;
   $('#engine-note').textContent = status.producer_fault || status.harvester_failure
-    ? 'The producer stopped after a source failure. Restart only after checking the local adapter.'
+    ? source?.state === 'retrying'
+      ? 'The source is retrying within its configured limit. Allocations are paused until a complete frame is accepted.'
+      : 'The producer stopped after a source failure. Restart only after checking the local adapter.'
     : status.mode === 'experimental'
       ? 'Experimental output is for pipeline research. The supplemental inputs have no assessed entropy.'
-      : 'Fresh OS random bytes are mixed into every generation. The synthetic inputs add no claimed entropy.';
+      : 'Fresh OS random bytes are mixed into every generation. Supplemental inputs add no claimed entropy.';
   $('#consume').disabled = busy || status.producer_fault || status.queued < 1;
   $('#dashboard').hidden = false;
   $('#connected').hidden = false;
@@ -48,7 +61,11 @@ $('#connect-form').addEventListener('submit', async event => {
 });
 $('#disconnect').addEventListener('click', () => {
   generation++;
+  outputGeneration++;
   token = '';
+  $('#context').value = '';
+  $('#output-status').textContent = '';
+  $('#client-name').textContent = '';
   $('#output').textContent = 'No output allocated.';
   $('#dashboard').hidden = true;
   $('#connected').hidden = true;
@@ -59,16 +76,17 @@ $('#disconnect').addEventListener('click', () => {
 $('#consume').addEventListener('click', async () => {
   if (busy) return;
   const current = generation;
+  const display = ++outputGeneration;
   busy = true;
   $('#consume').disabled = true;
   $('#output-status').textContent = 'Allocating…';
   try {
     const result = await api('bytes', {method:'POST', body:JSON.stringify({count:1, context:$('#context').value})});
-    if (current !== generation || !token) return;
+    if (current !== generation || display !== outputGeneration || !token) return;
     const block = result.blocks[0];
     $('#output').textContent = block.base64;
     $('#output-status').textContent = `${result.client} · allocation ${block.sequence} · ${block.bytes} bytes`;
-  } catch (error) { if (current === generation && token) $('#output-status').textContent = error.message; }
+  } catch (error) { if (current === generation && display === outputGeneration && token) $('#output-status').textContent = error.message; }
   finally {
     busy = false;
     if (current !== generation || !token) return;
@@ -76,6 +94,7 @@ $('#consume').addEventListener('click', async () => {
   }
 });
 $('#clear').addEventListener('click', () => {
+  outputGeneration++;
   $('#output').textContent = 'No output allocated.';
   $('#output-status').textContent = '';
 });

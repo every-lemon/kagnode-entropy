@@ -18,3 +18,4 @@ jobs:
           python3 -m pip install playwright==1.64.1
           python3 -m playwright install --with-deps chromium
       - run: python3 tests/browser_check.py
+      - run: python3 tests/browser_failure_check.py

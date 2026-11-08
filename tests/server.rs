@@ -43,6 +43,9 @@ fn state() -> AppState {
         ),
         port: 8098,
         linux_counters: false,
+        source_status: Arc::new(std::sync::Mutex::new(
+            kagnode_entropy::sources::SourceStatus::synthetic(),
+        )),
     }
 }
 fn request(method: &str, path: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
@@ -178,6 +181,13 @@ async fn local_assets_csp_and_no_source_paths() {
         "/app.js",
         "/app.css",
         "/mark.svg",
+        "/brand/entropy-lockup-dark.svg",
+        "/brand/entropy-lockup-light.svg",
+        "/brand/favicon.svg",
+        "/brand/favicon.png",
+        "/brand/favicon.ico",
+        "/favicon.ico",
+        "/brand/apple-touch-icon.png",
         "/core/controls.css",
     ] {
         let r = app

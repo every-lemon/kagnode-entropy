@@ -36,6 +36,10 @@ try:
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{port}/')
+            expect(page.locator('header .brand img')).to_have_attribute('alt', 'KagNode. Entropy')
+            assert page.locator('header .brand img').evaluate('(image) => image.complete && image.naturalWidth > 0')
+            assert page.locator('header .brand img').evaluate('(image) => image.currentSrc').endswith(f'entropy-lockup-{scheme}.svg')
+            assert page.locator('link[rel=icon][type="image/svg+xml"]').get_attribute('href') == '/brand/favicon.svg'
             page.locator('#token').fill(token)
             page.get_by_role('button', name='Connect', exact=True).click()
             page.locator('#dashboard').wait_for(state='visible')
@@ -46,9 +50,12 @@ try:
             assert page.evaluate('localStorage.length === 0 && sessionStorage.length === 0')
             assert not errors, errors
             page.screenshot(path=str(ARTIFACTS / f'{name}.png'), full_page=True)
+            page.locator('#context').fill('private-fixture-context')
             page.get_by_role('button', name='Disconnect').click()
             assert page.locator('#dashboard').is_hidden()
             assert page.locator('#output').inner_text() == 'No output allocated.'
+            assert page.locator('#context').input_value() == ''
+            assert page.locator('#output-status').inner_text() == ''
             context.close()
         # A late response from the disconnected identity must not restore output.
         context = browser.new_context()
@@ -70,6 +77,36 @@ try:
         page.wait_for_timeout(700)
         assert page.locator('#dashboard').is_hidden()
         assert page.locator('#output').inner_text() == 'No output allocated.'
+        context.close()
+        # Clear output also wins against a delayed response in the same identity.
+        context = browser.new_context()
+        page = context.new_page()
+        page.goto(f'http://127.0.0.1:{port}/')
+        page.locator('#token').fill(token)
+        page.get_by_role('button', name='Connect', exact=True).click()
+        page.locator('#dashboard').wait_for(state='visible')
+        page.evaluate("""() => {
+          const realFetch = window.fetch;
+          window.fetch = async (...args) => {
+            const response = await realFetch(...args);
+            if (String(args[0]).endsWith('/bytes')) await new Promise(resolve => setTimeout(resolve, 500));
+            return response;
+          };
+        }""")
+        page.get_by_role('button', name='Allocate 64 bytes').click()
+        page.get_by_role('button', name='Clear output').click()
+        page.wait_for_timeout(700)
+        assert page.locator('#output').inner_text() == 'No output allocated.'
+        assert page.locator('#output-status').inner_text() == ''
+        # A framework/proxy plain-text error gets actionable feedback, no retry.
+        requests = []
+        def plain_error(route):
+            requests.append(1)
+            route.fulfill(status=503, content_type='text/plain', body='fixture failure')
+        page.route('**/api/v1/bytes', plain_error)
+        page.get_by_role('button', name='Allocate 64 bytes').click()
+        expect(page.locator('#output-status')).to_contain_text('unexpected response (503)')
+        assert len(requests) == 1
         context.close()
         browser.close()
     print('Browser QA passed: desktop/mobile/small, both themes, allocation, disconnect, late response, no overflow or persistent token storage.')

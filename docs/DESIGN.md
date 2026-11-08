@@ -1,4 +1,4 @@
-# Engine design — 0.1.0-alpha.1
+# Engine design — 0.1.0-alpha.2
 
 ## Data flow
 
@@ -32,7 +32,7 @@ The RustCrypto crates implement the cryptographic primitives. Different labels p
 
 One mutex covers key rotation, queue mutation, sequence counters and audit ordering. A full queue returns backpressure before sampling more OS random bytes. Batch allocation validates the whole requested size before removing anything. Every removed chunk is burned even if writing the response or audit record fails. No automatic allocation retry is performed.
 
-A source failure blocks allocation. The CLI stops the instance; library users may explicitly retry generation after repairing a source. An audit write error is sticky for that audit instance. Successful generation audit records precede queue insertion; a record is a diagnostic event, not proof of successful delivery or assessed entropy.
+A source failure blocks allocation. Video input uses its bounded retry policy; a successful generation clears a recoverable source fault. After the retry budget is exhausted, `serve` keeps the local status interface available while allocations remain blocked, then exits nonzero when stopped. `sample` exits nonzero on an unrecovered failure; library users may explicitly retry generation after repairing a source. An audit write error is sticky for that audit instance. Successful generation audit records precede queue insertion; a record is a diagnostic event, not proof of successful delivery or assessed entropy.
 
 A process-ID check occurs before taking the mutex. Forked copies must construct a fresh engine. The preview does not prevent VM rollback, restored snapshots, cloned environments or a privileged adversary. Instance and sequence IDs identify allocations within an uninterrupted instance; they do not assert collision impossibility across machines.
 
@@ -54,9 +54,11 @@ The local preview intentionally bounds throughput. No sustained high-speed or pr
 
 ## Adapter boundary
 
-Library callers supply decoded pixels via `Sample`; source ingestion never interprets a URL or launches a decoder. A future video adapter must bound resolution, frame rate, decoder memory, queue time and subprocess lifetime. A public stream is observable and influenceable. Authenticating transport or fingerprinting pixels does not assess its entropy.
+Library callers supply decoded pixels via `Sample`. The CLI also includes an opt-in public-video connector: Rust performs bounded HTTP reads through checked public addresses, and a controlled FFmpeg child converts stdin into fixed raw RGB frames. See [VIDEO.md](VIDEO.md) for formats, limits, lifecycle and unverified real-codec behavior.
 
-The CLI defaults to fictional counters and synthetic frames. `--linux-counters` reads only the fixed `/proc/net/dev` path, with a bounded read. No arbitrary filesystem scan or shell command is used. A future enclave adapter needs a separate RNG/I/O integration and validation; ordinary Linux `/proc` and OS RNG assumptions cannot simply be relabeled enclave-trusted.
+Source workers run independently of HTTP handling. Full pools apply backpressure; partial frames are discarded; normal bounded sessions are renewed; failure retries are finite. Exhausted failures leave the local status UI available with allocations blocked. Source metadata contains no URL, decoder path or raw media.
+
+The default still uses synthetic frames and fictional counters. `--linux-counters` reads only the fixed `/proc/net/dev` path after a complete frame and clock sample, with a bounded read. An enclave target would require separate RNG/I/O integration and validation; ordinary Linux assumptions cannot be relabeled enclave-trusted.
 
 ## Memory
 

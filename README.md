@@ -1,4 +1,4 @@
-<p align="center"><a href="#brand-artwork"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" height="96" alt="KagNode. Entropy"></picture></a></p>
+<p align="center"><a href="#brand-artwork"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" alt="KagNode. Entropy"></picture></a></p>
 <h1 align="center">KagNode Entropy</h1>
 <p align="center">A Rust source preview for OS-backed randomness and supplemental-input research.</p>
 

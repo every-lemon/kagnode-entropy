@@ -1,0 +1,8 @@
+{
+  "integration": "pinned controls stylesheet only; no updater or account adapter",
+  "repository": "https://github.com/every-lemon/kagnode-core",
+  "commit": "383476497a535823a0106bca54589e307941d5b0",
+  "files": {
+    "web/controls.css": "339b3f660c1eb524b2d8eaa0ea44b17e57652ad62bf9f064acf7bfb1da68a866"
+  }
+}

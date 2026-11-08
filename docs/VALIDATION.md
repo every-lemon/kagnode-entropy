@@ -1,0 +1,26 @@
+# Verification — 0.1.0-alpha.1
+
+The published primary runtime is Rust. The temporary Python prototype is not part of this repository. Tests use deterministic fixtures, temporary fake audit records and isolated loopback HTTP. No public video source, camera, native hardware entropy device, real account, live mail service or enclave deployment is involved.
+
+```sh
+cargo fmt --check
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
+cargo build --locked
+python3 -m pip install playwright==1.64.1
+python3 -m playwright install chromium
+python3 tests/browser_check.py
+```
+
+Locally verified on Linux x86-64 using Rust 1.99.1:
+
+- **40 Rust tests passed**, including RFC HMAC/HKDF known-answer vectors, blueprint order, independent key/chunk material, deterministic replay, source failure without fallback, bounded inputs, atomic batches, concurrent allocation/production, fork refusal and owned-buffer cleanup.
+- Audit checks passed for bounded retention, opt-in metadata, tampering, truncation against an independent checkpoint, wrong keys, symlinks, existing paths, sticky I/O failure and burned allocations on audit failure.
+- API checks passed for identity binding, client rate isolation, body/origin/Host/method limits, local asset boundaries and public-bind refusal.
+- SGX/Nitro **mock** policy checks passed for platform mismatch, debug/SVN rejection, nonce/key/freshness checks and the unconditional refusal to claim hardware verification or release secrets.
+- Optimized release compilation and CLI checks passed for 64-byte output, required experimental acknowledgement, private audit creation/verification and exclusion of generated output from the audit.
+- Chromium checks passed at 1,365, 390 and 320 CSS pixels in dark/light themes: allocation, disconnection, late-response suppression, no horizontal overflow or persistent token storage. The disposable server exited cleanly on SIGTERM.
+
+The source declares Rust 1.88 as its minimum language/dependency target; local qualification used 1.99.1. There are no prebuilt binaries, published Cargo package or supported production deployment in this release. Dependencies are pinned in `Cargo.lock`; the Core stylesheet hash is pinned separately.
+
+These checks establish specified behavior. They do not measure min-entropy, certify the construction, prove collision impossibility, demonstrate physical erasure, validate genuine attestation or benchmark production throughput. No independent cryptographic review or platform qualification has been performed. Browser screenshots and transient development artifacts stay under ignored `.runtime/`.

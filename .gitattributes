@@ -1,0 +1,2 @@
+# Preserve exact third-party copyright notice bytes from the pinned artwork source.
+static/brand/FONT-NOTICES.txt -whitespace

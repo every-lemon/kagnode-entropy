@@ -6,6 +6,8 @@ This source preview is intended for inspection and pipeline experiments. Its dow
 
 OS-backed mode trusts the host OS, its RNG, the Rust toolchain, dependencies and this implementation. Assume an adversary can observe or influence public video, timing and network traffic, call the local API without credentials, race consumers or exhaust request budgets. Do not assume the supplemental observations are independent.
 
+The opt-in video connector introduces an HTTP/TLS and multimedia-decoder attack surface. Protocol restrictions, process limits and child cleanup are not a security sandbox; real decoder/host isolation is unqualified.
+
 The ordinary process cannot protect keys against a compromised kernel, root, a debugger with access, hostile hypervisor, stolen live-memory image or malicious build dependency. A caller that controls the injected library `RandomSource` also controls the RNG assumption. Injection exists for deterministic tests and explicit integrators; the CLI always uses the OS source.
 
 ## Claims the preview deliberately does not make
@@ -26,7 +28,7 @@ The ordinary process cannot protect keys against a compromised kernel, root, a d
 
 ## Remaining work before production consideration
 
-Specify the consuming application's security needs; obtain independent cryptographic and implementation review; choose and assess actual sources; implement source-specific health testing; review decoder boundaries, token lifecycle, TLS, quotas and multi-process ownership; validate restore/rollback behavior and an incident-response policy. If an enclave target is selected, build and verify that separate target and client attestation protocol before releasing secrets to it.
+Specify the consuming application's security needs; obtain independent cryptographic and implementation review; assess actual sources and real-decoder behavior; implement source-specific health testing; independently review decoder boundaries, token lifecycle, TLS, quotas and multi-process ownership; validate restore/rollback behavior and an incident-response policy. If an enclave target is selected, build and verify that separate target and client attestation protocol before releasing secrets to it.
 
 ## Primary references
 

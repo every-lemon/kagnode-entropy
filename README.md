@@ -1,50 +1,75 @@
-<p align="center"><img src="static/mark.svg" width="72" height="72" alt="KagNode mark"></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" height="96" alt="KagNode. Entropy"></picture></p>
 <h1 align="center">KagNode Entropy</h1>
 <p align="center">A Rust source preview for OS-backed randomness and supplemental-input research.</p>
 
-**Version 0.1.0-alpha.1 · AGPL-3.0-only · Linux · local preview**
+## Overview
 
-KagNode Entropy mixes bounded raw-pixel samples, timestamps and counter bytes through a three-stage HMAC-SHA-512 pipeline. A locked queue allocates each queued chunk once, and authenticated client identities bind the final output. Separate HKDF labels derive the next key and queued material.
+KagNode Entropy mixes bounded raw-pixel samples, timestamps and counter bytes through a three-stage HMAC-SHA-512 pipeline. A locked queue allocates each queued chunk once; authenticated client identities bind the final output. Separate HKDF labels derive the next key and queued material.
 
-The default **OS-backed** mode adds fresh operating-system randomness on every generation. The **experimental** mode omits that fresh contribution and requires explicit acknowledgement. Neither mode assigns an entropy estimate to video, timing or network counters. For ordinary application secrets, use the OS RNG directly; this experimental construction has not received an independent cryptographic review.
+The default **OS-backed** mode adds fresh operating-system randomness to every generation. **Experimental** mode omits that fresh contribution and requires acknowledgement. Neither mode assigns an entropy estimate to video, timing or network counters. For ordinary application secrets, use the OS RNG directly; this custom composition has not received independent cryptographic review.
 
-The included interface runs locally, serves KagNode Core styles without a CDN and uses synthetic pixels by default. This is an ordinary Rust process. SGX and Nitro are separate proposed deployment profiles, with simulation-only policy tests; no enclave service or verified hardware attestation is included.
+## Release status
 
-## Run locally
+**0.1.0-alpha.2 · Linux source preview · AGPL-3.0-only**
 
-Install a current [Rust toolchain](https://rust-lang.org/tools/install/) on Linux. Build with the committed lockfile:
+The runtime is an ordinary Rust process. There is no hosted entropy service, prebuilt binary, published Cargo package or validated enclave target. SGX/Nitro design profiles have simulation-only policy checks, which never authorize secret release. Real video decoding and live-stream compatibility have not been qualified; the connector is tested with mock transport and a fixed-RGB process fixture.
+
+## Features
+
+- Two explicit modes, a 64-byte key, fresh default OS input and independent rekey/output derivation.
+- Atomic bounded allocations, authenticated client binding and per-client rate limits and bounded connections.
+- Opt-in direct public-video ingestion through a bounded HTTP-to-decoder pipe; synthetic pixels remain the default.
+- A locally served responsive KagNode interface, source status and clear failure feedback.
+- Optional metadata-only HMAC audit with retention bounds and separate privacy controls.
+- Optional own-process tracer policy and best-effort clearing of owned buffers.
+- Explicit threat model, source lifecycle tests and SGX/Nitro policy fixtures.
+
+## Requirements
+
+Runtime: Linux. Building requires Rust/Cargo 1.88 or newer and a C build toolchain for the TLS dependency; local checks used Rust 1.99.1 on x86-64 Linux. Other Linux architectures are not qualified by this release.
+
+Video input additionally needs an administrator-installed, maintained FFmpeg executable supporting the documented fixed arguments. The project does not install a decoder or fetch media by default. Development tests use Python 3 for a tiny mock process; browser tests additionally use Playwright.
+
+## Installation and downloads
+
+Only source is released:
 
 ```sh
+git clone https://github.com/every-lemon/kagnode-entropy.git
+cd kagnode-entropy
 cargo build --locked --release
+```
+
+Use the committed `Cargo.lock`. See [revision history](CHANGELOG.md) for preview changes. There is no installer, auto-updater, daemon registration or infrastructure deployment.
+
+## Usage
+
+```sh
 ./target/release/kagnode-entropy sample --count 2
 ./target/release/kagnode-entropy serve
 ```
 
-Open `http://127.0.0.1:8098`. The terminal prints two disposable local client tokens once. Paste one into the interface; it stays in page memory and is cleared on disconnect. Restarting replaces the tokens and the engine state. Do not save terminal output containing tokens or redirect generated samples into an audit log.
+Open `http://127.0.0.1:8098`. The terminal prints two disposable client tokens once. Paste one into the interface; it stays in page memory and is cleared on disconnect. Restarting replaces the tokens and engine state. Do not save terminal output containing tokens or redirect generated samples into audit records.
 
 ```sh
-# Explicit research mode, not an assessed entropy source:
+# Research mode: supplemental entropy is unassessed.
 ./target/release/kagnode-entropy serve --mode experimental --acknowledge-experimental
 
-# Optional Linux counter input; the default uses fictional counters:
+# Optional host counters; default counters are fictional.
 ./target/release/kagnode-entropy serve --linux-counters
+
+# Replace this reserved hostname with an authorized direct public media source.
+./target/release/kagnode-entropy serve \
+  --video-url 'https://media.example.invalid/live.ts' --video-decoder /usr/bin/ffmpeg
 ```
 
-No video service is contacted. An application adapter can pass decoded frames to the bounded `Sample` API; see [design and integration](docs/DESIGN.md). A real decoder, public-video connector and source health assessment remain future work.
+The video connector fetches direct HTTP(S) media through checked public addresses, then supplies bytes to a controlled child through stdin. It bounds transfer bytes, raw frames, time, child resources and retries. Watch pages and HLS/DASH playlists are unsupported. See [video configuration](docs/VIDEO.md) before enabling it.
 
-## Included
+## Configuration and storage
 
-- Two explicit modes, a 64-byte key, fresh OS input in the default mode and separate rekey/output derivation.
-- Atomic bounded allocations, client-bound output, per-client rate limits and bounded HTTP connections.
-- A locally served, responsive KagNode interface with clear preview state.
-- An opt-in metadata-only HMAC-chained audit with bounded retention and private files.
-- Optional own-process tracer detection that stops this instance and clears owned buffers on a best-effort basis.
-- SGX/Nitro design profiles and mock policy checks that **never** authorize secret release.
-- Known-answer, concurrency, bounds, failure, audit, API and policy tests.
+All settings are local CLI arguments. Source URLs, decoder paths and secret tokens cannot be configured through the browser/API. The listener stays on loopback; use `--help` for bounds and options. Engine keys and queue entries are held in memory, subject to the documented limits of buffer clearing.
 
-## Audit and defensive controls
-
-Auditing is **off by default**. It never records generated outputs, current keys, raw pixels, raw counter blobs, client identities, tokens or context strings. Timing, aggregate network totals and keyed frame fingerprints are separate privacy opt-ins.
+Auditing is **off by default**. It never records outputs, engine keys, raw media, raw counter blobs, client identities, tokens or context strings. Timing, aggregate counter totals and keyed frame fingerprints are separate privacy opt-ins.
 
 ```sh
 mkdir -p "$HOME/.local/state/kagnode/entropy"
@@ -56,20 +81,35 @@ mkdir -p "$HOME/.local/state/kagnode/entropy"
   --audit-segment-records 1024 --audit-retained-segments 4
 ```
 
-The key file must be new; each session directory must also be new. The default retention cap is four segments of at most 1,024 records each. Graceful shutdown prints a checkpoint to retain independently. An attacker with the audit key can forge a chain; a checkpoint stored only beside the log cannot establish independent history. Read [audit and defense](docs/HARDENING.md) before relying on it.
+Each key/session path must be new. Default retention is four segments of at most 1,024 records each. Graceful shutdown prints a checkpoint to retain independently. Read [audit and defense](docs/HARDENING.md): adjacent logs/checkpoints do not establish independent history, and possession of the audit key allows forgery.
 
-`serve --stop-if-traced` opts into polling this process's Linux `TracerPid` field. This can interrupt legitimate debugging and can miss or be bypassed by an attacker. There is no `chattr`, firewall, ptrace, kernel, VM or host-security modification. SIGKILL and power loss cannot run cleanup handlers.
+## Security
 
-## Review and contribute
+The construction, real decoder integration and hardware trust assumptions are unqualified. Child resource/protocol limits are not an OS sandbox. Public inputs can repeat or be influenced; diagnostics and hashes are not proofs of entropy. No impossible-collision, zero-vulnerability, root-proof audit or physical-erasure claim is made.
+
+`serve --stop-if-traced` opts into polling this process's `TracerPid`. Polling may miss an attacker or interrupt legitimate debugging. No global host-security settings are modified. SIGKILL and power loss cannot run cleanup handlers. Read [SECURITY.md](SECURITY.md) and the [threat model](docs/THREAT-MODEL.md).
+
+## Development and testing
 
 ```sh
 cargo fmt --check
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
+cargo build --locked
+python3 -m pip install playwright==1.64.1
+python3 -m playwright install chromium
+python3 tests/browser_check.py
+python3 tests/browser_failure_check.py
 ```
 
-Read [threat model](docs/THREAT-MODEL.md), [API](docs/API.md), [TEE roadmap](docs/TEE.md), [validation](docs/VALIDATION.md) and [security reporting](SECURITY.md).
+Tests use deterministic samples, fake HTTP, temporary audit fixtures and an isolated RGB-emitting Python stub. They do not fetch a stream or run a real media decoder. See [validation scope](docs/VALIDATION.md). Main is protected by required GitHub Actions checks and a pull-request workflow, including administrators; force-push and deletion are disabled.
 
-Source code is licensed under **AGPL-3.0-only**. KagNode artwork has separate [artwork terms](static/ARTWORK-LICENSE). The locally bundled Core stylesheet has [provenance](static/core/NOTICE) and a [pinned digest](core.lock.json). The UI uses system fonts.
+## Documentation
+
+[Engine design](docs/DESIGN.md) · [Local API](docs/API.md) · [Video connector](docs/VIDEO.md) · [Audit and defense](docs/HARDENING.md) · [Threat model](docs/THREAT-MODEL.md) · [TEE roadmap](docs/TEE.md) · [Validation](docs/VALIDATION.md)
+
+## Licensing
+
+Source is **AGPL-3.0-only**; see [LICENSE](LICENSE). The product SVGs and transparent favicons come from KagNode Logos, with [pinned provenance](branding.lock.json), [artwork terms](static/ARTWORK-LICENSE) and retained [outlined typography notices](static/brand/FONT-NOTICES.txt). The locally bundled Core stylesheet has [provenance](static/core/NOTICE) and a [pinned digest](core.lock.json). The interface uses system fonts.
 
 [KagNode Website](https://nebulacoder.com) · [Developer](https://developer.nebulacoder.com) · [Source](https://github.com/every-lemon/kagnode-entropy)

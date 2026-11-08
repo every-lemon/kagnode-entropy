@@ -10,9 +10,11 @@ use kagnode_entropy::{
     audit::{self, AuditConfig, AuditLog, Privacy},
     crypto::{OsRandom, RandomSource},
     defense,
-    engine::{Engine, Error, Mode},
+    engine::{Engine, Mode},
     server::{self, AppState, Registry},
-    sources::{self, SyntheticSource},
+    sources::SourceDriver,
+    video::{FfmpegFactory, VideoConfig, VideoSource},
+    video_http::HttpTransport,
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
 use zeroize::Zeroizing;
@@ -69,6 +71,8 @@ struct Common {
     acknowledge_experimental: bool,
     #[arg(long)]
     linux_counters: bool,
+    #[command(flatten)]
+    video: VideoOptions,
     #[arg(long, requires = "audit_key_file")]
     audit_directory: Option<PathBuf>,
     #[arg(long, requires = "audit_directory")]
@@ -115,21 +119,55 @@ fn make_engine(
         log,
     )?))
 }
-fn ingest(
-    engine: &Engine,
-    source: &mut SyntheticSource,
-    linux_counters: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if engine.snapshot()?.queued >= engine.capacity {
-        return Ok(());
-    }
-    let mut sample = source.sample();
-    if linux_counters {
-        sample.counters = sources::linux_network_counters()?;
-    }
-    match engine.ingest(&sample) {
-        Ok(_) | Err(Error::Full) => Ok(()),
-        Err(e) => Err(e.into()),
+#[derive(Args)]
+struct VideoOptions {
+    /// Explicit opt-in: a direct public HTTP(S) media stream, not a watch page or playlist.
+    #[arg(long)]
+    video_url: Option<String>,
+    #[arg(long, default_value = "/usr/bin/ffmpeg")]
+    video_decoder: PathBuf,
+    #[arg(long, default_value_t=64, value_parser=clap::value_parser!(u32).range(1..=512))]
+    video_width: u32,
+    #[arg(long, default_value_t=64, value_parser=clap::value_parser!(u32).range(1..=512))]
+    video_height: u32,
+    #[arg(long, default_value_t=10, value_parser=clap::value_parser!(u32).range(1..=30))]
+    video_fps: u32,
+    #[arg(long, default_value_t=10, value_parser=clap::value_parser!(u64).range(1..=30))]
+    video_timeout_seconds: u64,
+    #[arg(long, default_value_t=300, value_parser=clap::value_parser!(u64).range(1..=600))]
+    video_session_seconds: u64,
+    #[arg(long, default_value_t=64, value_parser=clap::value_parser!(u64).range(1..=256))]
+    video_input_mib: u64,
+    #[arg(long, default_value_t=512, value_parser=clap::value_parser!(u64).range(128..=2048))]
+    video_memory_mib: u64,
+    #[arg(long, default_value_t=2, value_parser=clap::value_parser!(u8).range(0..=5))]
+    video_retries: u8,
+}
+impl VideoOptions {
+    fn driver(&self) -> Result<SourceDriver, Box<dyn std::error::Error>> {
+        if let Some(url) = &self.video_url {
+            let config = VideoConfig {
+                url: url.clone(),
+                decoder: self.video_decoder.clone(),
+                width: self.video_width,
+                height: self.video_height,
+                fps: self.video_fps,
+                frame_timeout: Duration::from_secs(self.video_timeout_seconds),
+                session_lifetime: Duration::from_secs(self.video_session_seconds),
+                max_input_bytes: self.video_input_mib * 1024 * 1024,
+                memory_mib: self.video_memory_mib,
+                retries: self.video_retries,
+                retry_delay: Duration::from_secs(1),
+            };
+            Ok(SourceDriver::Video(VideoSource::new(
+                config,
+                Arc::new(FfmpegFactory {
+                    transport: Arc::new(HttpTransport),
+                }),
+            )?))
+        } else {
+            Ok(SourceDriver::synthetic())
+        }
     }
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
@@ -157,15 +195,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         Command::Sample { common, count } => {
+            let mut source = common.video.driver()?;
             let engine = make_engine(&common, count as usize)?;
-            let mut source = SyntheticSource::default();
-            for _ in 0..count {
-                ingest(&engine, &mut source, common.linux_counters)?;
+            let (stop_tx, mut stop_rx) = tokio::sync::watch::channel(false);
+            let mut terminate =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+            let signal_task = tokio::spawn(async move {
+                tokio::select! {_=tokio::signal::ctrl_c()=>{},_=terminate.recv()=>{}}
+                let _ = stop_tx.send(true);
+            });
+            let generation = async {
+                let mut ready = 0;
+                while ready < count {
+                    if *stop_rx.borrow() {
+                        return Err(kagnode_entropy::video::VideoError::Stopped);
+                    }
+                    if source
+                        .step(&engine, common.linux_counters, &mut stop_rx)
+                        .await?
+                    {
+                        ready += 1;
+                    }
+                }
+                Ok::<(), kagnode_entropy::video::VideoError>(())
+            }
+            .await;
+            let cleanup = source.shutdown().await;
+            signal_task.abort();
+            let _ = signal_task.await;
+            generation?;
+            cleanup?;
+            if *stop_rx.borrow() {
+                return Err(kagnode_entropy::video::VideoError::Stopped.into());
             }
             let blocks = engine.consume("local-cli", count as usize, "")?;
             println!(
                 "{}",
-                serde_json::json!({"mode":common.mode,"source":"synthetic pixels","blocks":blocks.iter().map(|d|STANDARD.encode(d.value.as_ref())).collect::<Vec<_>>()})
+                serde_json::json!({"mode":common.mode,"source":if common.video.video_url.is_some(){"public video"}else{"synthetic pixels"},"blocks":blocks.iter().map(|d|STANDARD.encode(d.value.as_ref())).collect::<Vec<_>>()})
             );
             print_checkpoint(&engine);
             engine.close();
@@ -177,6 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             interval_ms,
             stop_if_traced,
         } => {
+            let source = common.video.driver()?;
             let engine = make_engine(&common, capacity as usize)?;
             if stop_if_traced
                 && !defense::apply_tracer_observation(&engine, defense::own_process_traced())
@@ -202,30 +269,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 registry: Arc::new(Registry::new(tokens, 16.0, 32)?),
                 port,
                 linux_counters: common.linux_counters,
+                source_status: source.status(),
             };
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
-            let mut runner = tokio::spawn(server::serve(listener, state, stop_rx));
-            let mut source = SyntheticSource::default();
-            let mut ticker = tokio::time::interval(Duration::from_millis(interval_ms));
-            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let mut runner = tokio::spawn(server::serve(listener, state, stop_rx.clone()));
+            let period = if common.video.video_url.is_some() {
+                Duration::from_millis(1000 / common.video.video_fps as u64)
+            } else {
+                Duration::from_millis(interval_ms)
+            };
+            let mut producer =
+                tokio::spawn(source.run(engine.clone(), common.linux_counters, period, stop_rx));
+            let mut producer_finished = false;
             let mut defense_tick = tokio::time::interval(Duration::from_millis(250));
-            #[cfg(unix)]
             let mut terminate =
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
             let mut stopped_for_failure = false;
+            let mut network_result = None;
             loop {
                 tokio::select! {
-                    _=ticker.tick()=>{if ingest(&engine,&mut source,common.linux_counters).is_err(){engine.source_failed(); stopped_for_failure = true; eprintln!("Producer stopped after a source or audit failure.");break;}},
-                    _=defense_tick.tick(),if stop_if_traced=>{if !defense::apply_tracer_observation(&engine, defense::own_process_traced()){stopped_for_failure = true; eprintln!("Own-process tracer policy stopped this instance.");break;}},
-                    _=tokio::signal::ctrl_c()=>{break;},
-                    _=terminate.recv()=>{break;},
-                    result=&mut runner=>{engine.close(); result??; return Err("Preview listener stopped unexpectedly".into());},
+                    result=&mut producer,if !producer_finished=>{
+                        producer_finished=true;
+                        if !matches!(result,Ok(Ok(()))){engine.source_failed();stopped_for_failure=true;eprintln!("Source unavailable. Allocations are blocked; inspect the local source status and restart after correction.");}
+                    },
+                    _=defense_tick.tick(),if stop_if_traced=>{if !defense::apply_tracer_observation(&engine,defense::own_process_traced()){stopped_for_failure=true;eprintln!("Own-process tracer policy stopped this instance.");break;}},
+                    _=tokio::signal::ctrl_c()=>break,
+                    _=terminate.recv()=>break,
+                    result=&mut runner=>{network_result=Some(result);break;},
                 }
+            }
+            let _ = stop_tx.send(true);
+            if !producer_finished && !matches!(producer.await, Ok(Ok(()))) {
+                stopped_for_failure = true;
             }
             print_checkpoint(&engine);
             engine.close();
-            let _ = stop_tx.send(true);
-            runner.await??;
+            if let Some(result) = network_result {
+                result??;
+            } else {
+                runner.await??;
+            }
             if stopped_for_failure {
                 return Err("Instance stopped by source, audit or tracer policy".into());
             }

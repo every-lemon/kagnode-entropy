@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="KagNode. Entropy">
+<!-- PHASE 00: transparent canvas; geometry and typography are vectors -->
+<!-- PHASE 01: canonical geometric symbol -->
+<g transform="translate(0 0) scale(2)" fill="#111111"><path d="M5 4h3a1 1 0 0 1 1 1v22a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M12 4h15a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H12a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M12 13.5h8a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/><path d="M25 13.5h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/><path d="M12 23h15a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H12a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/></g>
+</svg>

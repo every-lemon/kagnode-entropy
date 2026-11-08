@@ -1,0 +1,67 @@
+{
+  "repository": "https://github.com/every-lemon/kagnode-logos",
+  "commit": "c86f9b878ce4cd03851117d726eace5fcdd16f06",
+  "integration": "Unmodified Entropy product SVG lockups/marks and transparent favicon exports; legacy /mark.svg and Core assets retained.",
+  "files": [
+    {
+      "source": "svg/entropy-lockup-dark.svg",
+      "path": "static/brand/entropy-lockup-dark.svg",
+      "sha256": "61802595a7b52f7f568f240b96761e40c6417ee334a47ff1b35182cecb3fbeea"
+    },
+    {
+      "source": "svg/entropy-lockup-light.svg",
+      "path": "static/brand/entropy-lockup-light.svg",
+      "sha256": "6ad636a0d70127e6b82119587d76abd8b97d8fd54b97208cf78798295ceecb56"
+    },
+    {
+      "source": "svg/entropy-mark-dark.svg",
+      "path": "static/brand/entropy-mark-dark.svg",
+      "sha256": "4bd4cc034fa1af91c29d37a610d2b536f426bff551dd48eb2fc0cca2069f53dd"
+    },
+    {
+      "source": "svg/entropy-mark-light.svg",
+      "path": "static/brand/entropy-mark-light.svg",
+      "sha256": "b8417d90cda61643ec0517aff01db1ea2730c09b7c5e3b19fbff84cfa6fc196d"
+    },
+    {
+      "source": "svg/entropy-mark-black.svg",
+      "path": "static/brand/entropy-mark-black.svg",
+      "sha256": "a47f45a834a4639e3ca0f6d365307fb5dea693c7b7479f32b125769c307c8ffe"
+    },
+    {
+      "source": "svg/entropy-mark-white.svg",
+      "path": "static/brand/entropy-mark-white.svg",
+      "sha256": "f08e051da3ce2621a6a6df48d2f3f1fbc172bbef0ab65f7b676af0c9ea92aead"
+    },
+    {
+      "source": "icons/entropy/favicon.svg",
+      "path": "static/brand/favicon.svg",
+      "sha256": "b8417d90cda61643ec0517aff01db1ea2730c09b7c5e3b19fbff84cfa6fc196d"
+    },
+    {
+      "source": "icons/entropy/entropy-32.png",
+      "path": "static/brand/favicon.png",
+      "sha256": "697c837997b8f4ce451b0517f120141875b91b60dafd7a78d4349233504e7697"
+    },
+    {
+      "source": "icons/entropy/favicon.ico",
+      "path": "static/brand/favicon.ico",
+      "sha256": "61776442e29ee32b41bd3c5f822cbfa85efb6ea601f9ce9ab9e781ba71f677cf"
+    },
+    {
+      "source": "icons/entropy/entropy-180.png",
+      "path": "static/brand/apple-touch-icon.png",
+      "sha256": "905e886c33d910b842816dec70d6f9ab61a094d6130b61fac0dfec3601bfd472"
+    },
+    {
+      "source": "source/FONT-NOTICES.txt",
+      "path": "static/brand/FONT-NOTICES.txt",
+      "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
+    },
+    {
+      "source": "LICENSE",
+      "path": "static/ARTWORK-LICENSE",
+      "sha256": "f5d14c8bdb8bc2c356764d91c4e8abd0ad7cf5091f7ee0869bc35b54957c1ff9"
+    }
+  ]
+}

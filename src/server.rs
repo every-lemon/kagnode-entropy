@@ -126,6 +126,7 @@ pub struct AppState {
     pub registry: Arc<Registry>,
     pub port: u16,
     pub linux_counters: bool,
+    pub source_status: Arc<Mutex<crate::sources::SourceStatus>>,
 }
 fn failure(status: StatusCode, code: &str, message: &str) -> Response {
     let mut response = (
@@ -186,7 +187,13 @@ async fn status(State(state): State<AppState>, headers: HeaderMap) -> Response {
         Ok(snapshot) => {
             let mut value = serde_json::to_value(snapshot).unwrap();
             value["client"] = json!(client);
-            value["source"] = json!("synthetic pixels");
+            let source = state.source_status.lock().ok().map(|s| s.clone());
+            value["source"] = json!(match source.as_ref().map(|s| s.kind) {
+                Some("public-video") => "public video",
+                Some("synthetic") => "synthetic pixels",
+                _ => "unavailable",
+            });
+            value["source_status"] = json!(source);
             value["counter_source"] = json!(if state.linux_counters {
                 "linux-proc-net-dev"
             } else {
@@ -273,19 +280,59 @@ async fn allocate(State(state): State<AppState>, headers: HeaderMap, body: Bytes
     }
 }
 async fn assets(request: Request) -> Response {
-    let (content, mime): (&str, &str) = match request.uri().path() {
+    let (content, mime): (&[u8], &str) = match request.uri().path() {
         "/" => (
-            include_str!("../static/index.html"),
+            include_bytes!("../static/index.html"),
             "text/html; charset=utf-8",
         ),
         "/app.js" => (
-            include_str!("../static/app.js"),
+            include_bytes!("../static/app.js"),
             "text/javascript; charset=utf-8",
         ),
-        "/app.css" => (include_str!("../static/app.css"), "text/css; charset=utf-8"),
-        "/mark.svg" => (include_str!("../static/mark.svg"), "image/svg+xml"),
+        "/app.css" => (
+            include_bytes!("../static/app.css"),
+            "text/css; charset=utf-8",
+        ),
+        "/mark.svg" => (include_bytes!("../static/mark.svg"), "image/svg+xml"),
+        "/brand/entropy-lockup-dark.svg" => (
+            include_bytes!("../static/brand/entropy-lockup-dark.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/entropy-lockup-light.svg" => (
+            include_bytes!("../static/brand/entropy-lockup-light.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/entropy-mark-dark.svg" => (
+            include_bytes!("../static/brand/entropy-mark-dark.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/entropy-mark-light.svg" => (
+            include_bytes!("../static/brand/entropy-mark-light.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/entropy-mark-black.svg" => (
+            include_bytes!("../static/brand/entropy-mark-black.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/entropy-mark-white.svg" => (
+            include_bytes!("../static/brand/entropy-mark-white.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/favicon.svg" => (
+            include_bytes!("../static/brand/favicon.svg"),
+            "image/svg+xml",
+        ),
+        "/brand/favicon.png" => (include_bytes!("../static/brand/favicon.png"), "image/png"),
+        "/brand/favicon.ico" | "/favicon.ico" => (
+            include_bytes!("../static/brand/favicon.ico"),
+            "image/x-icon",
+        ),
+        "/brand/apple-touch-icon.png" => (
+            include_bytes!("../static/brand/apple-touch-icon.png"),
+            "image/png",
+        ),
         "/core/controls.css" => (
-            include_str!("../static/core/controls.css"),
+            include_bytes!("../static/core/controls.css"),
             "text/css; charset=utf-8",
         ),
         _ => return StatusCode::NOT_FOUND.into_response(),
@@ -296,7 +343,7 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route(
             "/health",
-            get(|| async { Json(json!({"status":"source-preview","source":"synthetic pixels"})) }),
+            get(|| async { Json(json!({"status":"source-preview","service":"KagNode Entropy","trusted_execution":"none"})) }),
         )
         .route("/api/v1/status", get(status))
         .route("/api/v1/bytes", post(allocate))

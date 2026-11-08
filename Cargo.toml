@@ -1,19 +1,22 @@
 [package]
 name = "kagnode-entropy"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 edition = "2024"
 rust-version = "1.88"
 license = "AGPL-3.0-only"
 description = "A local OS-backed randomness and supplemental entropy research preview"
 repository = "https://github.com/every-lemon/kagnode-entropy"
 readme = "README.md"
-include = ["src/**", "static/**", "docs/**", "tests/**", "Cargo.toml", "Cargo.lock", "README.md", "SECURITY.md", "LICENSE", "core.lock.json", "CHANGELOG.md"]
+include = ["src/**", "static/**", "docs/**", "tests/**", "Cargo.toml", "Cargo.lock", "README.md", "SECURITY.md", "LICENSE", "core.lock.json", "branding.lock.json", "CHANGELOG.md"]
 
 [dependencies]
 axum = "0.8"
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive"] }
 getrandom = "0.4"
+bytes = "1"
+url = "2"
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 hex = "0.4"
 hkdf = "0.13"
 hmac = { version = "0.13", features = ["zeroize"] }
@@ -25,7 +28,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = { version = "0.11", features = ["zeroize"] }
 subtle = "2.6"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "process", "io-util"] }
 zeroize = { version = "1.9", features = ["derive"] }
 
 [dev-dependencies]

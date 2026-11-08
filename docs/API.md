@@ -6,7 +6,7 @@
 
 The CLI prints two disposable bearer tokens, each bound to one fixed identity. Send `Authorization: Bearer TOKEN`. Do not put tokens in URLs, source repositories, logs or browser persistent storage. Client identity cannot be supplied in request JSON. Restart invalidates all tokens. There is no token-management or account-integration service in this preview.
 
-`GET /health` is public and identifies source-preview status and the absence of trusted execution. It is a liveness response, not proof that a source can supply frames. Static assets are public on the loopback listener.
+`GET /health` is public and identifies the compiled package version, source-preview status and the absence of trusted execution. It is a liveness response, not proof that a source can supply frames. Static assets are public on the loopback listener.
 
 `GET /api/v1/status` requires authentication and returns the client's identity, mode, capacity, queued/produced/consumed counts, producer failure state, audit-enabled state, zero claimed supplemental entropy bits and `trusted_execution: "none: ordinary process"`. It also returns `source_status` with kind/state, geometry, accepted-frame/start/failure counts and a fixed error code. It never returns secret key, S3, queue material, source frames, configured source URL, decoder path or audit key. Exhausted video failures keep status available while allocations return 503.
 

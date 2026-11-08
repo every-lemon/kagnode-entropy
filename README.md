@@ -1,4 +1,4 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" height="96" alt="KagNode. Entropy"></picture></p>
+<p align="center"><a href="#brand-artwork"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" height="96" alt="KagNode. Entropy"></picture></a></p>
 <h1 align="center">KagNode Entropy</h1>
 <p align="center">A Rust source preview for OS-backed randomness and supplemental-input research.</p>
 
@@ -10,7 +10,7 @@ The default **OS-backed** mode adds fresh operating-system randomness to every g
 
 ## Release status
 
-**0.1.0-alpha.2 · Linux source preview · AGPL-3.0-only**
+**0.1.0-alpha.3 · Linux source preview · AGPL-3.0-only**
 
 The runtime is an ordinary Rust process. There is no hosted entropy service, prebuilt binary, published Cargo package or validated enclave target. SGX/Nitro design profiles have simulation-only policy checks, which never authorize secret release. Real video decoding and live-stream compatibility have not been qualified; the connector is tested with mock transport and a fixed-RGB process fixture.
 
@@ -39,6 +39,8 @@ git clone https://github.com/every-lemon/kagnode-entropy.git
 cd kagnode-entropy
 cargo build --locked --release
 ```
+
+To update an existing checkout, run `git pull --ff-only`, rebuild with the same command, and restart your locally launched preview. The interface and artwork are embedded in the binary; pulling source alone does not update a running UI. `./target/release/kagnode-entropy --version` and `/health` identify the build.
 
 Use the committed `Cargo.lock`. See [revision history](CHANGELOG.md) for preview changes. There is no installer, auto-updater, daemon registration or infrastructure deployment.
 
@@ -107,6 +109,12 @@ Tests use deterministic samples, fake HTTP, temporary audit fixtures and an isol
 ## Documentation
 
 [Engine design](docs/DESIGN.md) · [Local API](docs/API.md) · [Video connector](docs/VIDEO.md) · [Audit and defense](docs/HARDENING.md) · [Threat model](docs/THREAT-MODEL.md) · [TEE roadmap](docs/TEE.md) · [Validation](docs/VALIDATION.md)
+
+## Brand artwork
+
+[SVG symbol](static/brand/entropy-mark-light.svg) · [Dark-background SVG](static/brand/entropy-mark-dark.svg) · [Transparent 512px PNG](static/brand/entropy-mark-512.png) · [Complete artwork collection](https://github.com/every-lemon/kagnode-logos)
+
+The dedicated E symbol, product wordmark and favicon set use the pinned canonical artwork. The header image links here; artwork permissions are separate from the software license.
 
 ## Licensing
 

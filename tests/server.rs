@@ -185,6 +185,7 @@ async fn local_assets_csp_and_no_source_paths() {
         "/brand/entropy-lockup-light.svg",
         "/brand/favicon.svg",
         "/brand/favicon.png",
+        "/brand/entropy-mark-512.png",
         "/brand/favicon.ico",
         "/favicon.ico",
         "/brand/apple-touch-icon.png",
@@ -203,6 +204,16 @@ async fn local_assets_csp_and_no_source_paths() {
                 .contains("frame-ancestors 'none'")
         );
     }
+    let health = app
+        .clone()
+        .oneshot(request("GET", "/health", None, None))
+        .await
+        .unwrap();
+    assert_eq!(health.status(), StatusCode::OK);
+    assert_eq!(
+        json_body(health).await["version"],
+        env!("CARGO_PKG_VERSION")
+    );
     for path in ["/Cargo.toml", "/../Cargo.toml", "/src/engine.rs"] {
         assert_eq!(
             app.clone()
@@ -282,4 +293,17 @@ async fn public_listener_is_refused() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await.unwrap();
     let (_, rx) = tokio::sync::watch::channel(false);
     assert!(server::serve(listener, state(), rx).await.is_err());
+}
+
+#[test]
+fn out_of_order_requests_cannot_rewind_the_rate_bucket_clock() {
+    let registry = Registry::new(vec![("A".repeat(43), "alice".into())], 1.0, 2).unwrap();
+    let start = Instant::now();
+    assert!(registry.allow_at("alice", 2, start));
+    let newer = start + Duration::from_secs(2);
+    assert!(registry.allow_at("alice", 2, newer));
+    // A request can obtain its timestamp before waiting for the shared lock.
+    assert!(!registry.allow_at("alice", 1, start + Duration::from_secs(1)));
+    assert!(!registry.allow_at("alice", 1, newer));
+    assert!(registry.allow_at("alice", 1, newer + Duration::from_secs(1)));
 }

@@ -112,7 +112,9 @@ impl Registry {
         bucket.available = (bucket.available
             + now.saturating_duration_since(bucket.time).as_secs_f64() * self.rate)
             .min(self.burst);
-        bucket.time = now;
+        // A request can timestamp before waiting for this mutex. Never let an
+        // older arrival move the refill clock backwards and grant credit twice.
+        bucket.time = now.max(bucket.time);
         if bucket.available < count as f64 {
             return false;
         }
@@ -187,6 +189,7 @@ async fn status(State(state): State<AppState>, headers: HeaderMap) -> Response {
         Ok(snapshot) => {
             let mut value = serde_json::to_value(snapshot).unwrap();
             value["client"] = json!(client);
+            value["version"] = json!(env!("CARGO_PKG_VERSION"));
             let source = state.source_status.lock().ok().map(|s| s.clone());
             value["source"] = json!(match source.as_ref().map(|s| s.kind) {
                 Some("public-video") => "public video",
@@ -318,6 +321,10 @@ async fn assets(request: Request) -> Response {
             include_bytes!("../static/brand/entropy-mark-white.svg"),
             "image/svg+xml",
         ),
+        "/brand/entropy-mark-512.png" => (
+            include_bytes!("../static/brand/entropy-mark-512.png"),
+            "image/png",
+        ),
         "/brand/favicon.svg" => (
             include_bytes!("../static/brand/favicon.svg"),
             "image/svg+xml",
@@ -343,7 +350,7 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route(
             "/health",
-            get(|| async { Json(json!({"status":"source-preview","service":"KagNode Entropy","trusted_execution":"none"})) }),
+            get(|| async { Json(json!({"status":"source-preview","service":"KagNode Entropy","version":env!("CARGO_PKG_VERSION"),"trusted_execution":"none"})) }),
         )
         .route("/api/v1/status", get(status))
         .route("/api/v1/bytes", post(allocate))

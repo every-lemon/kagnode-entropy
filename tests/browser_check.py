@@ -74,6 +74,22 @@ try:
             assert page.locator('#context').input_value() == ''
             assert page.locator('#output-status').inner_text() == ''
             context.close()
+        # GitHub constrains README image width. A fixed height distorted the
+        # published product lockup on narrow screens; render that exact markup.
+        readme_logo = re.search(r'<p align="center">.*?</p>', (ROOT / 'README.md').read_text(), re.S).group(0)
+        readme_logo = readme_logo.replace('static/brand/', '/brand/')
+        fixture = '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}.markdown-body{width:254px}.markdown-body img{max-width:100%}</style><main class="markdown-body">' + readme_logo + '</main>'
+        for scheme in ('light', 'dark'):
+            context = browser.new_context(viewport={'width':320,'height':240}, color_scheme=scheme)
+            page = context.new_page()
+            page.route('**/readme-preview', lambda route: route.fulfill(content_type='text/html', body=fixture))
+            page.goto(f'http://127.0.0.1:{port}/readme-preview')
+            logo = page.get_by_role('img', name='KagNode. Entropy', exact=True)
+            expect(logo).to_be_visible()
+            dimensions = logo.evaluate('(i) => ({width:i.getBoundingClientRect().width,height:i.getBoundingClientRect().height,src:i.currentSrc,loaded:i.complete&&i.naturalWidth>0})')
+            assert dimensions['loaded'] and dimensions['src'].endswith('entropy-lockup-' + scheme + '.svg')
+            assert dimensions['width'] == 254 and abs(dimensions['width']/dimensions['height'] - 304/96) < .03, dimensions
+            context.close()
         # A late response from the disconnected identity must not restore output.
         context = browser.new_context()
         page = context.new_page()

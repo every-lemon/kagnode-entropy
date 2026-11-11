@@ -4,6 +4,8 @@ Current acceptance covers unchanged OS output, bounded allocation, independent a
 
 Browser checks exercise the actual disposable Rust service in Chromium and WebKit. Core manifests/signatures/assets and generated markup are validated locally. Source archive inspection and disposable Debian/Rocky Linux 10 package lifecycle results are recorded by release CI. Package installation does not establish native daemon provisioning or hardware qualification.
 
+Dependency checks use pinned `cargo-audit` 0.23.0 against the committed `Cargo.lock` and the current RustSec advisory database, without fixing or rewriting dependencies. CI retains the machine-readable report and verifies that the lockfile stays unchanged. The result is a time-bound known-advisory check, not an independent source audit or proof that dependencies have no undiscovered vulnerabilities.
+
 No Media deployment, FFmpeg transcoding, HTTP Boot image build or hardware test is part of this release. The following historical preview notes retain their original verification scope.
 
 # Verification — 0.1.0-alpha.3

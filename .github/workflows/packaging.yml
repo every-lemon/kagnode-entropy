@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
 jobs:
+  advisory-audit:
+    uses: ./.github/workflows/security.yml
   packages:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -31,7 +33,7 @@ jobs:
           path: dist/packages/
   publish:
     if: startsWith(github.ref, 'refs/tags/packages/v') || startsWith(github.ref, 'refs/tags/v')
-    needs: packages
+    needs: [packages, advisory-audit]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

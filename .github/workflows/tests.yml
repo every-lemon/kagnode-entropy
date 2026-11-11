@@ -3,6 +3,8 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  advisory-audit:
+    uses: ./.github/workflows/security.yml
   check:
     runs-on: ubuntu-latest
     steps:

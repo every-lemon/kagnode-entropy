@@ -1,6 +1,7 @@
 [
   ".gitattributes",
   ".github/workflows/packaging.yml",
+  ".github/workflows/security.yml",
   ".github/workflows/tests.yml",
   ".gitignore",
   "CHANGELOG.md",

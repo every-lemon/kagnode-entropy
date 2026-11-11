@@ -1,0 +1,25 @@
+name: Dependency advisory audit
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  advisory-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned RustSec client
+        run: cargo install cargo-audit --version 0.23.0 --locked --no-default-features
+      - name: Audit committed dependency lockfile
+        run: |
+          cargo audit --file Cargo.lock --json > rustsec-audit.json
+          git diff --exit-code -- Cargo.toml Cargo.lock
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: rustsec-advisory-audit
+          path: rustsec-audit.json
+          if-no-files-found: warn

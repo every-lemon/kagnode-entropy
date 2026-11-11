@@ -15,7 +15,9 @@ function showProgress(label) {
   };
 }
 function notify(message) {
-  $(active ? "#message" : "#login-message").textContent = message;
+  const output = $(active ? "#message" : "#login-message");
+  output.textContent = message;
+  output.hidden = !message;
 }
 function clearSession() {
   epoch++;

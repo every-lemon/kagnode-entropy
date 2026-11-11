@@ -88,7 +88,7 @@ for kind, attr in [
 for filename in ["index.html", "admin.html", "link.html"]:
     html = (ROOT / "ui" / filename).read_text().replace("</head>", head + "</head>")
     if filename in {"admin.html", "link.html"}:
-        content = '<form id="admin-login-form"><label for="credential">Administrator key</label><input id="credential" type="password" required autocomplete="current-password" maxlength="128"><button type="submit"><span data-core-icon="lock"></span>Sign in</button></form><p id="login-message" role="status"></p>'
+        content = '<form id="admin-login-form"><label for="credential">Administrator key</label><input id="credential" type="password" required autocomplete="current-password" maxlength="128"><button type="submit"><span data-core-icon="lock"></span>Sign in</button></form><p id="login-message" role="status" hidden></p>'
         provider = '<button type="button" data-core-login-provider hidden><span data-core-icon="account"></span>Login with KagNode</button><p data-core-login-status role="status"></p>'
         frame = render(
             "login-frame",

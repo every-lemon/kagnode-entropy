@@ -111,6 +111,7 @@ with tempfile.TemporaryDirectory(prefix="entropy-admin-browser-") as temporary:
                 assert page.locator("[data-core-login]").evaluate(
                     "e=>{const n=document.createElement('div');n.style.backgroundColor='var(--kn-panel)';e.append(n);const color=getComputedStyle(n).backgroundColor;n.remove();return getComputedStyle(e).backgroundColor===color}"
                 ), frame
+                expect(page.locator("#login-message")).to_be_hidden()
                 page.screenshot(path=str(artifacts / f"{width}-login.png"))
                 page.locator("#credential").fill(credential)
                 page.get_by_role("button", name="Sign in", exact=True).click()

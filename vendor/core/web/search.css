@@ -1,0 +1,151 @@
+/* KagNode Core quick search; component rules do not affect other dialogs. */
+html[data-kn-core] dialog.kn-core-search {
+  position: fixed;
+  inset: 0;
+  margin: min(10dvh, 80px) auto auto;
+  width: min(640px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: min(80dvh, var(--kn-search-viewport, 80dvh));
+  padding: 0;
+  border: 1px solid var(--kn-line);
+  border-radius: 12px;
+  background: var(--kn-panel);
+  color: var(--kn-text);
+  box-shadow: 0 20px 70px #0005;
+  overflow: hidden;
+  font: inherit;
+}
+.kn-core-search::backdrop {
+  background: #0008;
+  backdrop-filter: blur(4px);
+}
+.kn-core-search .kn-core-search-head {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-bottom: 1px solid var(--kn-line);
+}
+.kn-core-search .kn-core-search-label {
+  display: block;
+  padding: 0;
+  color: var(--kn-muted);
+  font-size: 12px;
+}
+.kn-core-search .kn-core-search-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 56px 12px 12px;
+  border: 1px solid var(--kn-line);
+  background: var(--kn-bg);
+  color: var(--kn-text);
+  font: inherit;
+  font-size: 16px;
+  outline-offset: 2px;
+}
+.kn-core-search .kn-core-search-close {
+  position: absolute;
+  right: 27px;
+  bottom: 27px;
+  padding: 4px 6px;
+  background: var(--kn-panel);
+  color: var(--kn-muted);
+  border: 1px solid var(--kn-line);
+  font: inherit;
+  font-size: 11px;
+}
+.kn-core-search .kn-core-search-results {
+  max-height: min(48dvh, 420px);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+}
+.kn-core-search .kn-core-search-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  min-width: 0;
+  text-decoration: none;
+  color: var(--kn-text);
+  border-radius: 8px;
+}
+.kn-core-search .kn-core-search-row:hover,
+.kn-core-search .kn-core-search-row[aria-selected="true"] {
+  background: color-mix(in srgb, var(--kn-accent) 12%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--kn-accent) 35%, transparent);
+  outline-offset: -1px;
+}
+.kn-core-search .kn-core-search-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.kn-core-search .kn-core-search-copy strong {
+  font-size: 14px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.kn-core-search .kn-core-search-copy small {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--kn-muted);
+  overflow-wrap: anywhere;
+}
+.kn-core-search .kn-core-search-type {
+  flex: none;
+  font-size: 11px;
+  color: var(--kn-muted);
+}
+.kn-core-search .kn-core-search-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--kn-line);
+  font-size: 12px;
+}
+.kn-core-search .kn-core-search-status {
+  flex: 1;
+  min-width: 120px;
+  margin: 0;
+  color: var(--kn-muted);
+}
+.kn-core-search .kn-core-search-footer a {
+  color: var(--kn-focus);
+}
+.kn-core-search .kn-core-search-footer button {
+  font: inherit;
+  background: var(--kn-bg);
+  color: var(--kn-text);
+  border: 1px solid var(--kn-line);
+  padding: 6px 10px;
+}
+@media (max-height: 500px) {
+  html[data-kn-core] dialog.kn-core-search {
+    margin-top: 12px;
+    max-height: calc(100dvh - 24px);
+  }
+  .kn-core-search .kn-core-search-results {
+    max-height: 35dvh;
+  }
+}
+
+.kn-core-search[open] {
+  display: flex;
+  flex-direction: column;
+}
+.kn-core-search .kn-core-search-head,
+.kn-core-search .kn-core-search-footer {
+  flex: none;
+}
+.kn-core-search .kn-core-search-results {
+  flex: 1 1 auto;
+  min-height: 0;
+}

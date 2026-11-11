@@ -1,9 +1,204 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>KagNode Entropy — source preview</title><link rel="icon" href="/brand/favicon.svg" type="image/svg+xml"><link rel="icon" href="/brand/favicon.png" type="image/png" sizes="32x32"><link rel="apple-touch-icon" href="/brand/apple-touch-icon.png"><link rel="stylesheet" href="/core/controls.css"><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
-<body><a class="skip" href="#main">Skip to content</a><header><a class="brand" href="/" aria-label="KagNode Entropy home"><picture><source media="(prefers-color-scheme: light)" srcset="/brand/entropy-lockup-light.svg"><img src="/brand/entropy-lockup-dark.svg" alt="KagNode. Entropy" width="190" height="60"></picture></a><span class="preview">Source preview</span></header>
-<main id="main"><section class="intro"><p class="eyebrow">MULTI-LAYER ENTROPY FUSION ENGINE</p><h1>Explore the engine.</h1><p class="lede">An inspectable Rust HMAC mixing experiment. OS randomness supports the default mode. Public inputs carry no measured entropy claim.</p></section>
-<section class="connection card" aria-labelledby="connection-title"><div><h2 id="connection-title">Connect a local client</h2><p>Use a disposable token printed by your preview server. It stays in this tab’s memory.</p></div><form id="connect-form"><label for="token">Client token</label><div class="connection-fields"><input id="token" type="password" autocomplete="off" spellcheck="false" required maxlength="128" placeholder="Paste a preview token"><button type="submit">Connect</button></div></form><div id="connected" hidden><span id="client-name"></span><button id="disconnect" class="quiet" type="button">Disconnect</button></div><p id="connection-status" role="status"></p></section>
-<section id="dashboard" hidden aria-label="Engine status"><div class="section-heading"><div><p class="eyebrow">LIVE LOCAL PROCESS</p><h2>The pool</h2></div><span class="badge" id="mode"></span></div><div class="stats"><article class="card"><span>Ready to allocate</span><strong id="queued">—</strong><small id="capacity">64 bytes per chunk</small><progress id="pool-fill" max="128" value="0" aria-label="Pool capacity"></progress></article><article class="card"><span>Generated</span><strong id="produced">—</strong><small>Includes a separate rekey step</small></article><article class="card"><span>Allocated</span><strong id="consumed">—</strong><small>Removed before the response</small></article></div><p id="engine-note" class="notice" role="status"></p><p id="source-state" class="source-state" role="status"></p>
-<div class="workbench"><section class="card flow" aria-labelledby="pipeline-title"><p class="eyebrow">PIPELINE</p><h2 id="pipeline-title">Three inputs, one experiment.</h2><ol><li><span class="step">01</span><div><strong>Raw pixel bytes</strong><p id="pixel-source">A predictable 16 × 16 RGB fixture. No live stream is connected.</p></div><span class="stage">S1</span></li><li><span class="step">02</span><div><strong>System time</strong><p>Nanoseconds are encoded consistently. Precision is not entropy.</p></div><span class="stage">S2</span></li><li><span class="step">03</span><div><strong>Network counters</strong><p id="counter-source">Synthetic counters are the default. An optional Linux adapter can supply real host counters.</p></div><span class="stage">S3</span></li></ol><div class="key-flow"><span>OS input / experiment</span><span aria-hidden="true">→</span><strong>Separate chunk + next key</strong></div></section>
-<section class="card output" aria-labelledby="output-title"><p class="eyebrow">CLIENT ALLOCATION</p><h2 id="output-title">Inspect one response.</h2><p>The authenticated client identity is included in the derivation. Keys and raw pool chunks never appear here.</p><label for="context">Optional application label</label><input id="context" maxlength="128" placeholder="For example: local-demo" autocomplete="off"><div class="actions"><button id="consume" type="button">Allocate 64 bytes <span aria-hidden="true">↗</span></button><button id="clear" class="quiet" type="button">Clear output</button></div><p id="output-status" role="status"></p><pre id="output" tabindex="0" aria-label="Latest response">No output allocated.</pre><small>A lost response burns its chunk. Retrying allocates a new one.</small></section></div></section>
-<section class="limits"><h2>What this preview checks</h2><p>Queue bounds, locking, request limits, identity binding and rekey separation are testable behavior. It runs as an ordinary process, without a hardware enclave. This does not establish a min-entropy estimate, NIST validation, physical memory erasure, impossible collisions or secrecy after full process compromise.</p><p>For ordinary application secrets, use the operating system’s random API directly. The intended security use of this project remains under review.</p></section></main><footer><span>KagNode Entropy · AGPL-3.0-only</span><nav aria-label="Project links"><a href="https://nebulacoder.com">KagNode Website ↗</a><a href="https://github.com/every-lemon/kagnode-entropy">Source project ↗</a><a href="https://github.com/every-lemon/kagnode-entropy#brand-artwork">Logo files ↗</a></nav></footer></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>KagNode Entropy</title>
+    <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/brand/favicon.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/app.css" />
+    <script src="/app.js" defer></script>
+  <meta name="kagnode-core" content='{"app":"entropy","version":"5.0.2","authenticated":false}'><script src="/kagnode-core/5.0.2/theme.59858a18c8bbcee2.js"></script><link rel="stylesheet" href="/kagnode-core/5.0.2/core.fd96e4249774ebfb.css"><script src="/kagnode-core/5.0.2/core.dd5ec8f483938e61.js" defer></script></head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header>
+      <a class="brand" href="/" aria-label="KagNode Entropy home"
+        ><picture
+          ><source
+            media="(prefers-color-scheme: light)"
+            srcset="/brand/entropy-lockup-light.svg" />
+          <img
+            src="/brand/entropy-lockup-dark.svg"
+            alt="KagNode. Entropy"
+            width="190"
+            height="60" /></picture></a
+      ><span class="preview">OS-backed service</span>
+    </header>
+    <main id="main">
+      <section class="intro">
+        <p class="eyebrow">KAGNODE ENTROPY</p>
+        <h1>Randomness, from your OS.</h1>
+        <p class="lede">
+          A bounded, authenticated service for OS cryptographic randomness.
+          Explore service health and manage client access locally.
+        </p>
+      </section>
+      <section class="connection card" aria-labelledby="connection-title">
+        <div>
+          <h2 id="connection-title">Connect a local client</h2>
+          <p>
+            Use a client credential created in administration. It stays in this
+            tab’s memory.
+          </p>
+        </div>
+        <form id="connect-form">
+          <label for="token">Client token</label>
+          <div class="connection-fields">
+            <input
+              id="token"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              required
+              maxlength="128"
+              placeholder="Client credential"
+            /><button type="submit">Connect</button>
+          </div>
+        </form>
+        <div id="connected" hidden>
+          <span id="client-name"></span
+          ><button id="disconnect" class="quiet" type="button">
+            Disconnect
+          </button>
+        </div>
+        <p id="connection-status" role="status"></p>
+      </section>
+      <section id="dashboard" hidden aria-label="Engine status">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LIVE LOCAL PROCESS</p>
+            <h2>The pool</h2>
+          </div>
+          <span class="badge" id="mode"></span>
+        </div>
+        <div class="stats">
+          <article class="card">
+            <span>Ready to allocate</span><strong id="queued">—</strong
+            ><small id="capacity">64 bytes per chunk</small
+            ><progress
+              id="pool-fill"
+              max="128"
+              value="0"
+              aria-label="Pool capacity"
+            ></progress>
+          </article>
+          <article class="card">
+            <span>Generated</span><strong id="produced">—</strong
+            ><small>64-byte OS blocks in production</small>
+          </article>
+          <article class="card">
+            <span>Allocated</span><strong id="consumed">—</strong
+            ><small>Removed before the response</small>
+          </article>
+        </div>
+        <p id="engine-note" class="notice" role="status"></p>
+        <p id="source-state" class="source-state" role="status"></p>
+        <div class="workbench">
+          <section class="card flow" aria-labelledby="pipeline-title">
+            <p class="eyebrow">PIPELINE</p>
+            <h2 id="pipeline-title">Three inputs, one experiment.</h2>
+            <ol>
+              <li>
+                <span class="step">01</span>
+                <div>
+                  <strong>Raw pixel bytes</strong>
+                  <p id="pixel-source">
+                    A predictable 16 × 16 RGB fixture. No live stream is
+                    connected.
+                  </p>
+                </div>
+                <span class="stage">S1</span>
+              </li>
+              <li>
+                <span class="step">02</span>
+                <div>
+                  <strong>System time</strong>
+                  <p>
+                    Nanoseconds are encoded consistently. Precision is not
+                    entropy.
+                  </p>
+                </div>
+                <span class="stage">S2</span>
+              </li>
+              <li>
+                <span class="step">03</span>
+                <div>
+                  <strong>Network counters</strong>
+                  <p id="counter-source">
+                    Synthetic counters are the default. An optional Linux
+                    adapter can supply real host counters.
+                  </p>
+                </div>
+                <span class="stage">S3</span>
+              </li>
+            </ol>
+            <div class="key-flow">
+              <span>OS input / experiment</span><span aria-hidden="true">→</span
+              ><strong>Separate chunk + next key</strong>
+            </div>
+          </section>
+          <section class="card output" aria-labelledby="output-title">
+            <p class="eyebrow">CLIENT ALLOCATION</p>
+            <h2 id="output-title">Inspect one response.</h2>
+            <p>
+              Your credential authorizes access to OS-generated bytes.
+              Experimental derivation is separate; client labels add no entropy.
+            </p>
+            <label for="context">Optional application label</label
+            ><input
+              id="context"
+              maxlength="128"
+              placeholder="For example: local-demo"
+              autocomplete="off"
+            />
+            <div class="actions">
+              <button id="consume" type="button">
+                Allocate 64 bytes <span aria-hidden="true">↗</span></button
+              ><button id="clear" class="quiet" type="button">
+                Clear output
+              </button>
+            </div>
+            <p id="output-status" role="status"></p>
+            <pre id="output" tabindex="0" aria-label="Latest response">
+No output allocated.</pre
+            >
+            <small
+              >A lost response burns its chunk. Retrying allocates a new
+              one.</small
+            >
+          </section>
+        </div>
+      </section>
+      <section class="limits">
+        <h2>Supported security boundary</h2>
+        <p>
+          Queue bounds, locking, request limits, identity binding and rekey
+          separation are testable behavior. It runs as an ordinary process,
+          without a hardware enclave. This does not establish a min-entropy
+          estimate, NIST validation, physical memory erasure, impossible
+          collisions or secrecy after full process compromise.
+        </p>
+        <p>
+          The stable service uses the OS CSPRNG unchanged and trusts the host
+          OS. Experimental mode remains unassessed. For local applications,
+          direct OS randomness avoids the additional service and transport
+          boundary.
+        </p>
+      </section>
+    </main>
+    <footer>
+      <span>KagNode Entropy · AGPL-3.0-only</span>
+      <nav aria-label="Project links">
+        <a href="/admin">Administration</a
+        ><a href="https://nebulacoder.com">KagNode Website ↗</a
+        ><a href="https://github.com/every-lemon/kagnode-entropy"
+          >Source project ↗</a
+        ><a href="https://github.com/every-lemon/kagnode-entropy#brand-artwork"
+          >Logo files ↗</a
+        >
+      </nav>
+    </footer>
+  </body>
+</html>

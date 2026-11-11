@@ -1,0 +1,24 @@
+KagNode artwork permission
+Copyright (c) 2026 KagNode contributors
+
+Permission is granted, free of charge, to copy and display the unmodified KagNode
+artwork for accurate identification of the KagNode project, documentation,
+editorial discussion and redistribution with the official project. Resizing,
+format conversion and use of the supplied color variants are permitted. Retain
+this notice when redistributing the asset collection.
+
+This permission does not grant the right to present a separate product or
+service as KagNode, imply endorsement, register confusing identifiers, or claim
+exclusive ownership of the original artwork. Other uses require permission from
+the rights holder, except where applicable law independently permits the use.
+No trademark registration or worldwide clearance is represented.
+
+The generator code in scripts/ is licensed under MIT (see LICENSE-CODE).
+Typography retains the notices in source/FONT-NOTICES.txt. Application software
+licenses are separate; this artwork permission does not add restrictions to AGPL
+software or require a fork to retain KagNode branding.
+
+THE ARTWORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. TO THE EXTENT PERMITTED BY LAW, THE AUTHORS ARE
+NOT LIABLE FOR CLAIMS OR DAMAGES ARISING FROM ITS USE.

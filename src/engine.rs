@@ -169,31 +169,32 @@ impl Engine {
             state.source_failures = state.source_failures.saturating_add(1);
             return Err(Error::Source);
         }
-        let s3 = crypto::blueprint(
-            state.key.as_ref(),
-            &sample.pixels,
-            sample.timestamp_ns,
-            &sample.counters,
-        );
-        let contribution: &[u8] = if self.mode == Mode::OsBacked {
-            fresh.as_ref()
+        // Production bytes remain exactly the OS CSPRNG output. Public samples,
+        // identities and the experimental feedback construction cannot weaken it.
+        let (chunk, next_key) = if self.mode == Mode::OsBacked {
+            (fresh, Zeroizing::new([0u8; 64]))
         } else {
-            &[]
+            let s3 = crypto::blueprint(
+                state.key.as_ref(),
+                &sample.pixels,
+                sample.timestamp_ns,
+                &sample.counters,
+            );
+            let ikm = crypto::frame(&[
+                crypto::DOMAIN,
+                self.mode.label().as_bytes(),
+                s3.as_ref(),
+                &sequence.to_be_bytes(),
+            ]);
+            let hk = Hkdf::<Sha512>::new(Some(state.key.as_ref()), &ikm);
+            let mut chunk = Zeroizing::new([0u8; 64]);
+            let mut next_key = Zeroizing::new([0u8; 64]);
+            hk.expand(&[crypto::DOMAIN, b"pool-chunk"].concat(), chunk.as_mut())
+                .expect("64-byte HKDF output");
+            hk.expand(&[crypto::DOMAIN, b"next-key"].concat(), next_key.as_mut())
+                .expect("64-byte HKDF output");
+            (chunk, next_key)
         };
-        let ikm = crypto::frame(&[
-            crypto::DOMAIN,
-            self.mode.label().as_bytes(),
-            contribution,
-            s3.as_ref(),
-            &sequence.to_be_bytes(),
-        ]);
-        let hk = Hkdf::<Sha512>::new(Some(state.key.as_ref()), &ikm);
-        let mut chunk = Zeroizing::new([0u8; 64]);
-        let mut next_key = Zeroizing::new([0u8; 64]);
-        hk.expand(&[crypto::DOMAIN, b"pool-chunk"].concat(), chunk.as_mut())
-            .expect("64-byte HKDF output");
-        hk.expand(&[crypto::DOMAIN, b"next-key"].concat(), next_key.as_mut())
-            .expect("64-byte HKDF output");
         if let Some(audit) = state.audit.as_mut()
             && audit.produced(sequence, sample, start.elapsed()).is_err()
         {
@@ -245,7 +246,11 @@ impl Engine {
                 self.instance.as_bytes(),
                 &chunk.sequence.to_be_bytes(),
             ]);
-            let value = crypto::hmac512(chunk.material.as_ref(), &fields);
+            let value = if self.mode == Mode::OsBacked {
+                chunk.material
+            } else {
+                crypto::hmac512(chunk.material.as_ref(), &fields)
+            };
             result.push(Delivery {
                 sequence: chunk.sequence,
                 value,

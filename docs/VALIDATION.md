@@ -1,3 +1,11 @@
+# 5.0 release acceptance
+
+Current acceptance covers unchanged OS output, bounded allocation, independent administrator/consumer credentials, persistent hash storage, client rotation/revocation, CSRF, reauthentication, restart/exclusive-store ownership, profile consent/binding/expiry, owner-only sign-in, cancellation and policy invalidation. Provider protocol tests use isolated mocked issuer responses; they are not evidence of production account approvals or an independent cryptographic audit.
+
+Browser checks exercise the actual disposable Rust service in Chromium and WebKit. Core manifests/signatures/assets and generated markup are validated locally. Source archive inspection and disposable Debian/Rocky Linux 10 package lifecycle results are recorded by release CI. Package installation does not establish native daemon provisioning or hardware qualification.
+
+No Media deployment, FFmpeg transcoding, HTTP Boot image build or hardware test is part of this release. The following historical preview notes retain their original verification scope.
+
 # Verification — 0.1.0-alpha.3
 
 The published primary runtime is Rust. The temporary Python prototype is not part of this repository. Tests use deterministic fixtures, temporary fake audit records and isolated loopback HTTP. No public video source, camera, native hardware entropy device, real account, live mail service or enclave deployment is involved.

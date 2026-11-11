@@ -23,21 +23,33 @@ use tokio::{
     sync::{Semaphore, watch},
 };
 
-struct Client {
-    digest: [u8; 32],
-    id: String,
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Client {
+    pub(crate) digest: [u8; 32],
+    pub(crate) id: String,
 }
 struct Bucket {
     available: f64,
     time: Instant,
 }
 pub struct Registry {
-    clients: Vec<Client>,
+    clients: Mutex<Vec<Client>>,
+    enabled: std::sync::atomic::AtomicBool,
     buckets: Mutex<HashMap<String, Bucket>>,
     rate: f64,
     burst: f64,
 }
 impl Registry {
+    pub fn managed() -> Self {
+        Self {
+            clients: Mutex::new(vec![]),
+            enabled: std::sync::atomic::AtomicBool::new(true),
+            buckets: Mutex::new(HashMap::new()),
+            rate: 16.0,
+            burst: 32.0,
+        }
+    }
     pub fn new(tokens: Vec<(String, String)>, rate: f64, burst: u32) -> Result<Self, &'static str> {
         if tokens.is_empty()
             || tokens.len() > 64
@@ -71,13 +83,33 @@ impl Registry {
             clients.push(Client { digest, id });
         }
         Ok(Self {
-            clients,
+            clients: Mutex::new(clients),
+            enabled: std::sync::atomic::AtomicBool::new(true),
             buckets: Mutex::new(HashMap::new()),
             rate,
             burst: burst as f64,
         })
     }
+    pub(crate) fn disable(&self) {
+        self.enabled
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+    pub(crate) fn replace_clients(&self, clients: Vec<Client>) -> Result<(), &'static str> {
+        if !self.enabled.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err("Registry disabled after an uncertain store update");
+        }
+        let mut current = self.clients.lock().map_err(|_| "Registry unavailable")?;
+        *current = clients;
+        self.buckets
+            .lock()
+            .map_err(|_| "Quota state unavailable")?
+            .clear();
+        Ok(())
+    }
     pub fn authenticate(&self, headers: &HeaderMap) -> Option<String> {
+        if !self.enabled.load(std::sync::atomic::Ordering::SeqCst) {
+            return None;
+        }
         if headers.get_all(header::AUTHORIZATION).iter().count() != 1 {
             return None;
         }
@@ -91,7 +123,8 @@ impl Registry {
         }
         let digest: [u8; 32] = Sha256::digest(token.as_bytes()).into();
         let mut identity = None;
-        for client in &self.clients {
+        let clients = self.clients.lock().ok()?;
+        for client in clients.iter() {
             if bool::from(digest.ct_eq(&client.digest)) {
                 identity = Some(client.id.clone());
             }
@@ -99,7 +132,15 @@ impl Registry {
         identity
     }
     pub fn allow_at(&self, client: &str, count: usize, now: Instant) -> bool {
-        if !(1..=16).contains(&count) || !self.clients.iter().any(|c| c.id == client) {
+        if !self.enabled.load(std::sync::atomic::Ordering::SeqCst) {
+            return false;
+        }
+        if !(1..=16).contains(&count)
+            || !self
+                .clients
+                .lock()
+                .is_ok_and(|clients| clients.iter().any(|c| c.id == client))
+        {
             return false;
         }
         let Ok(mut buckets) = self.buckets.lock() else {
@@ -129,6 +170,7 @@ pub struct AppState {
     pub port: u16,
     pub linux_counters: bool,
     pub source_status: Arc<Mutex<crate::sources::SourceStatus>>,
+    pub management: Option<Arc<crate::management::Management>>,
 }
 fn failure(status: StatusCode, code: &str, message: &str) -> Response {
     let mut response = (
@@ -159,7 +201,7 @@ async fn boundary(State(state): State<AppState>, request: Request, next: Next) -
         failure(
             StatusCode::FORBIDDEN,
             "origin_rejected",
-            "Use the exact local preview URL; query credentials are not accepted",
+            "Use the exact local service URL; query credentials are not accepted",
         )
     } else if request.headers().contains_key(header::TRANSFER_ENCODING) {
         failure(
@@ -174,7 +216,7 @@ async fn boundary(State(state): State<AppState>, request: Request, next: Next) -
     h.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
     h.insert("x-content-type-options", "nosniff".parse().unwrap());
     h.insert("referrer-policy", "no-referrer".parse().unwrap());
-    h.insert("content-security-policy","default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'".parse().unwrap());
+    h.insert("content-security-policy","default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'".parse().unwrap());
     response
 }
 async fn status(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -283,10 +325,29 @@ async fn allocate(State(state): State<AppState>, headers: HeaderMap, body: Bytes
     }
 }
 async fn assets(request: Request) -> Response {
+    if let Some((bytes, mime)) = crate::core_assets::asset(request.uri().path()) {
+        return ([(header::CONTENT_TYPE, mime)], bytes).into_response();
+    }
     let (content, mime): (&[u8], &str) = match request.uri().path() {
         "/" => (
             include_bytes!("../static/index.html"),
             "text/html; charset=utf-8",
+        ),
+        "/admin/link" => (
+            include_bytes!("../static/link.html"),
+            "text/html; charset=utf-8",
+        ),
+        "/link.js" => (
+            include_bytes!("../static/link.js"),
+            "text/javascript; charset=utf-8",
+        ),
+        "/admin" => (
+            include_bytes!("../static/admin.html"),
+            "text/html; charset=utf-8",
+        ),
+        "/admin.js" => (
+            include_bytes!("../static/admin.js"),
+            "text/javascript; charset=utf-8",
         ),
         "/app.js" => (
             include_bytes!("../static/app.js"),
@@ -350,8 +411,9 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route(
             "/health",
-            get(|| async { Json(json!({"status":"source-preview","service":"KagNode Entropy","version":env!("CARGO_PKG_VERSION"),"trusted_execution":"none"})) }),
+            get(|| async { Json(json!({"status":"ok","service":"KagNode Entropy","version":env!("CARGO_PKG_VERSION"),"trusted_execution":"none"})) }),
         )
+        .merge(crate::management::routes())
         .route("/api/v1/status", get(status))
         .route("/api/v1/bytes", post(allocate))
         .fallback(get(assets))
@@ -368,7 +430,7 @@ pub async fn serve(
     if !listener.local_addr()?.ip().is_loopback() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
-            "Preview requires loopback",
+            "Service requires loopback",
         ));
     }
     let permits = Arc::new(Semaphore::new(8));

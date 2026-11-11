@@ -4,3 +4,12 @@
 *.key
 *.pem
 .env*
+
+/dist/
+__pycache__/
+!vendor/core/release-public.pem
+
+# Private local administration state; never publish even below a custom directory.
+credentials.json
+.service.lock
+.credentials-*

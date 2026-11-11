@@ -41,6 +41,7 @@ fn state() -> AppState {
             )
             .unwrap(),
         ),
+        management: None,
         port: 8098,
         linux_counters: false,
         source_status: Arc::new(std::sync::Mutex::new(
@@ -109,7 +110,9 @@ async fn authenticated_identity_and_exact_delivery() {
     assert_eq!(v["client"], "bob");
     assert_eq!(v["blocks"].as_array().unwrap().len(), 2);
     assert_eq!(v["blocks"][0]["bytes"], 64);
-    assert_ne!(v["blocks"][0]["base64"], v["blocks"][1]["base64"]);
+    // A deterministic OS fixture repeats; production does not manufacture uniqueness.
+    assert_eq!(v["blocks"][0]["base64"], v["blocks"][1]["base64"]);
+    assert_ne!(v["blocks"][0]["sequence"], v["blocks"][1]["sequence"]);
 }
 #[tokio::test]
 async fn caller_identity_and_bad_bounds_rejected() {

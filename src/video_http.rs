@@ -126,7 +126,11 @@ impl VideoTransport for HttpTransport {
                         attempt.follow()
                     }
                 }))
-                .user_agent("KagNode-Entropy/0.1 source-preview")
+                .user_agent(concat!(
+                    "KagNode-Entropy/",
+                    env!("CARGO_PKG_VERSION"),
+                    " experimental-video"
+                ))
                 .build()
                 .map_err(|_| VideoError::Configuration)?;
             let response = client

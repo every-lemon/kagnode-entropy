@@ -1,0 +1,91 @@
+/*! KagNode Core — loading presentation, AGPL-3.0-only. */
+html[data-kn-core] .kn-core-spinner {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--kn-spinner-size, 96px);
+  height: var(--kn-spinner-size, 96px);
+  overflow: visible;
+  vertical-align: middle;
+  color: #2563eb;
+  isolation: isolate;
+}
+html[data-kn-core] .kn-core-spinner > .kn-core-spinner-orbit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  overflow: visible;
+  fill: none;
+  stroke: none;
+}
+.kn-core-spinner-track {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.16;
+}
+.kn-core-spinner-sweep {
+  stroke: currentColor;
+  stroke-width: 2.75;
+  stroke-linecap: round;
+}
+.kn-core-spinner-node {
+  fill: currentColor;
+  stroke: none;
+}
+.kn-core-spinner-rotor {
+  transform-origin: 48px 48px;
+  animation: kn-core-orbit 1.8s linear infinite;
+}
+html[data-kn-core] .kn-core-spinner > .kn-core-spinner-mark {
+  display: block;
+  position: relative;
+  width: 50%;
+  height: 50%;
+  max-width: none;
+  object-fit: contain;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  animation: none;
+  transform: none;
+}
+/* Keep each application's status text, retry and dismissal controls intact. */
+html[data-kn-core]
+  [data-core-loading]
+  > :is(
+    .loading-logo,
+    .loading-strip,
+    .loading-dots,
+    .kag-loading-logo,
+    .brand,
+    svg
+  ),
+html[data-kn-core] [data-core-loading] .kag-loading-status > .kag-loading {
+  display: none !important;
+}
+html[data-kn-core] [data-core-loading] {
+  gap: 20px;
+}
+@keyframes kn-core-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kn-core-spinner-rotor {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  html[data-kn-core] .kn-core-spinner {
+    color: CanvasText;
+  }
+  .kn-core-spinner-track {
+    opacity: 1;
+    stroke: GrayText;
+  }
+}

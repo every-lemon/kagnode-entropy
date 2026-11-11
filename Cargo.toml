@@ -1,13 +1,13 @@
 [package]
 name = "kagnode-entropy"
-version = "0.1.0-alpha.3"
+version = "5.0.0"
 edition = "2024"
 rust-version = "1.88"
 license = "AGPL-3.0-only"
-description = "A local OS-backed randomness and supplemental entropy research preview"
+description = "A local OS-backed cryptographic randomness service"
 repository = "https://github.com/every-lemon/kagnode-entropy"
 readme = "README.md"
-include = ["src/**", "static/**", "docs/**", "tests/**", "Cargo.toml", "Cargo.lock", "README.md", "SECURITY.md", "LICENSE", "core.lock.json", "branding.lock.json", "CHANGELOG.md"]
+include = ["src/**", "static/**", "docs/**", "tests/**", "vendor/**", "scripts/**", "ui/**", "packaging/**", "Cargo.toml", "Cargo.lock", "README.md", "SECURITY.md", "LICENSE", "core.lock.json", "branding.lock.json", "CHANGELOG.md"]
 
 [dependencies]
 axum = "0.8"

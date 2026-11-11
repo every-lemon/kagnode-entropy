@@ -96,7 +96,7 @@ fn experimental_repeatability_is_not_entropy_evidence() {
 #[test]
 fn identity_context_and_next_generation_separate_fixed_fixture() {
     let run = |id: &str, context: &str| {
-        let e = engine(2);
+        let e = Engine::new(Mode::Experimental, 2, Fixed::new(), None).unwrap();
         e.ingest(&sample()).unwrap();
         e.ingest(&sample()).unwrap();
         e.consume(id, 2, context).unwrap()
@@ -242,4 +242,13 @@ fn opted_in_tracer_observation_stops_only_the_owned_engine() {
         Err(std::io::Error::other("mock status unavailable"))
     ));
     assert!(matches!(independent.snapshot(), Err(Error::Closed)));
+}
+
+#[test]
+fn production_output_is_exact_os_bytes_not_a_custom_derivation() {
+    let e = engine(1);
+    e.ingest(&sample()).unwrap();
+    let output = e.consume("alice", 1, "public-context").unwrap();
+    let expected: Vec<u8> = (0..64).map(|i| (i + 2) as u8).collect();
+    assert_eq!(output[0].value.as_ref(), expected.as_slice());
 }

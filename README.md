@@ -1,38 +1,44 @@
 <p align="center"><a href="#brand-artwork"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" alt="KagNode. Entropy"></picture></a></p>
 <h1 align="center">KagNode Entropy</h1>
-<p align="center">A Rust source preview for OS-backed randomness and supplemental-input research.</p>
+<p align="center">A local Rust service for operating-system cryptographic randomness.</p>
 
 ## Overview
 
-KagNode Entropy mixes bounded raw-pixel samples, timestamps and counter bytes through a three-stage HMAC-SHA-512 pipeline. A locked queue allocates each queued chunk once; authenticated client identities bind the final output. Separate HKDF labels derive the next key and queued material.
+KagNode Entropy distributes bounded, unchanged 64-byte blocks from the OS cryptographic RNG. Production output does not pass through a custom video/timing mixer. A memory-bounded queue and atomic allocation keep individual queue entries from being allocated twice within an uninterrupted instance; they do not promise mathematically unique byte strings or protection against host snapshots.
 
-The default **OS-backed** mode adds fresh operating-system randomness to every generation. **Experimental** mode omits that fresh contribution and requires acknowledgement. Neither mode assigns an entropy estimate to video, timing or network counters. For ordinary application secrets, use the OS RNG directly; this custom composition has not received independent cryptographic review.
+The locally served web interface provides a client API explorer and a separate administrator console. KagNode Core supplies the login frame, sidebar, icons, controls and scrolling. Browsers never fetch Core assets from GitHub.
 
 ## Release status
 
-**0.1.0-alpha.3 · Linux source preview · AGPL-3.0-only**
+**5.0.0** is the coordinated stable source release. Linux · AGPL-3.0-only.
 
-The runtime is an ordinary Rust process. There is no hosted entropy service, prebuilt binary, published Cargo package or validated enclave target. SGX/Nitro design profiles have simulation-only policy checks, which never authorize secret release. Real video decoding and live-stream compatibility have not been qualified; the connector is tested with mock transport and a fixed-RGB process fixture.
+Stable scope is the OS-backed local service, its API and administration. Supplemental-input experiments remain explicitly experimental. Video/decoder, enclave and hardware qualification are outside this release. No entropy-source assessment, cryptographic certification or compromised-host protection is claimed.
 
 ## Features
 
-- Two explicit modes, a 64-byte key, fresh default OS input and independent rekey/output derivation.
-- Atomic bounded allocations, authenticated client binding and per-client rate limits and bounded connections.
-- Opt-in direct public-video ingestion through a bounded HTTP-to-decoder pipe; synthetic pixels remain the default.
-- A locally served responsive KagNode interface, source status and clear failure feedback.
-- Optional metadata-only HMAC audit with retention bounds and separate privacy controls.
-- Optional own-process tracer policy and best-effort clearing of owned buffers.
-- Explicit threat model, source lifecycle tests and SGX/Nitro policy fixtures.
+- OS CSPRNG output, bounded atomic batches, per-client quotas and source-failure handling.
+- Private persistent client credential hashes, one-time token display, rotation and revocation.
+- Separate short-lived administrator sessions, CSRF protection and credential confirmation for access changes.
+- Explicit KagNode Account owner linking and fresh sign-in approval; no signup, email matching or remote role assignment.
+- Core 5 login, responsive navigation, profile display and account-only appearance controls.
+- Optional bounded metadata audit; generated output and credentials are excluded.
+- Offline startup and local administrator-key sign-in when KagNode is unavailable.
 
 ## Requirements
 
-Runtime: Linux. Building requires Rust/Cargo 1.88 or newer and a C build toolchain for the TLS dependency; local checks used Rust 1.99.1 on x86-64 Linux. Other Linux architectures are not qualified by this release.
+Linux; Rust/Cargo 1.88 or newer and the TLS dependencies required by the locked Rust dependencies. Build verification targets Linux x86-64. OpenSSL, Python 3 and rustfmt are needed to regenerate the verified UI. Browser development checks use Playwright with Chromium and WebKit.
 
-Video input additionally needs an administrator-installed, maintained FFmpeg executable supporting the documented fixed arguments. The project does not install a decoder or fetch media by default. Development tests use Python 3 for a tiny mock process; browser tests additionally use Playwright.
+The service deliberately listens only on loopback. Run browser administration on the trusted host or through an SSH tunnel to its canonical local URL. Internet-facing hosting and reverse-proxy deployment are not supported by this release's origin policy.
 
 ## Installation and downloads
 
-Only source is released:
+| Download | Contents | Platform |
+| --- | --- | --- |
+| Source `.tar.xz`, `.tar.gz`, `.zip` | Complete allowlisted source, embedded UI and instructions | Build on supported Linux |
+| Source `.deb` | Source/documentation under `/usr/share/kagnode/kagnode-entropy-source` | Architecture-independent; no service activation |
+| Source `.rpm` | Same source/documentation | Rocky Linux 10 package-installation scope; no native provisioning |
+
+Verify `SHA256SUMS` and `release-manifest.json` from the release. Source packages do not install a runnable daemon or reconfigure an existing host.
 
 ```sh
 git clone https://github.com/every-lemon/kagnode-entropy.git
@@ -40,84 +46,57 @@ cd kagnode-entropy
 cargo build --locked --release
 ```
 
-To update an existing checkout, run `git pull --ff-only`, rebuild with the same command, and restart your locally launched preview. The interface and artwork are embedded in the binary; pulling source alone does not update a running UI. `./target/release/kagnode-entropy --version` and `/health` identify the build.
-
-Use the committed `Cargo.lock`. See [revision history](CHANGELOG.md) for preview changes. There is no installer, auto-updater, daemon registration or infrastructure deployment.
-
 ## Usage
 
-```sh
-./target/release/kagnode-entropy sample --count 2
-./target/release/kagnode-entropy serve
-```
-
-Open `http://127.0.0.1:8098`. The terminal prints two disposable client tokens once. Paste one into the interface; it stays in page memory and is cleared on disconnect. Restarting replaces the tokens and engine state. Do not save terminal output containing tokens or redirect generated samples into audit records.
+Create a **new** private configuration directory. Its parent must already exist:
 
 ```sh
-# Research mode: supplemental entropy is unassessed.
-./target/release/kagnode-entropy serve --mode experimental --acknowledge-experimental
-
-# Optional host counters; default counters are fictional.
-./target/release/kagnode-entropy serve --linux-counters
-
-# Replace this reserved hostname with an authorized direct public media source.
-./target/release/kagnode-entropy serve \
-  --video-url 'https://media.example.invalid/live.ts' --video-decoder /usr/bin/ffmpeg
+./target/release/kagnode-entropy init --directory /path/to/new-private-directory
+./target/release/kagnode-entropy serve --credentials-file /path/to/new-private-directory/credentials.json
 ```
 
-The video connector fetches direct HTTP(S) media through checked public addresses, then supplies bytes to a controlled child through stdin. It bounds transfer bytes, raw frames, time, child resources and retries. Watch pages and HLS/DASH playlists are unsupported. See [video configuration](docs/VIDEO.md) before enabling it.
+Open `http://127.0.0.1:8098/admin`. Read `admin.key` locally and sign in; do not paste it into issues, terminal recordings or chat. Create a client credential and save its one-time value securely. `/` provides a client explorer; `/api/v1/bytes` allocates output using a consumer bearer credential. Administrator credentials do not authorize that consumer API.
+
+Use `sample --count 2` for local output. Disposable development uses `serve --ephemeral`; only that explicit mode prints temporary client tokens. Production startup does not print secrets.
 
 ## Configuration and storage
 
-All settings are local CLI arguments. Source URLs, decoder paths and secret tokens cannot be configured through the browser/API. The listener stays on loopback; use `--help` for bounds and options. Engine keys and queue entries are held in memory, subject to the documented limits of buffer clearing.
+The administrator directory is owned by the service user with mode 0700; files use 0600. `credentials.json` contains token hashes and the explicitly linked owner's display profile, not generated randomness or plaintext consumer keys. `admin.key` is a sensitive local recovery credential. Keep the directory outside the checkout/public assets and protect its backups. One process owns the store at a time; updates use atomic replacement and synchronization.
 
-Auditing is **off by default**. It never records outputs, engine keys, raw media, raw counter blobs, client identities, tokens or context strings. Timing, aggregate counter totals and keyed frame fingerprints are separate privacy opt-ins.
+Administrator sessions and recent administrative events are bounded and memory-only. Sessions expire after 15 minutes and disappear on restart. The queue also starts fresh. Client hashes and owner settings persist. Local sign-in remains available when account synchronization is disabled. `KAGNODE_ACCOUNT_SYNC=off` also disables provider sign-in.
 
-```sh
-mkdir -p "$HOME/.local/state/kagnode/entropy"
-./target/release/kagnode-entropy audit-key \
-  --path "$HOME/.local/state/kagnode/entropy/audit.key"
-./target/release/kagnode-entropy serve \
-  --audit-key-file "$HOME/.local/state/kagnode/entropy/audit.key" \
-  --audit-directory "$HOME/.local/state/kagnode/entropy/audit-session-1" \
-  --audit-segment-records 1024 --audit-retained-segments 4
-```
-
-Each key/session path must be new. Default retention is four segments of at most 1,024 records each. Graceful shutdown prints a checkpoint to retain independently. Read [audit and defense](docs/HARDENING.md): adjacent logs/checkpoints do not establish independent history, and possession of the audit key allows forgery.
+Optional metadata audit remains separate; see [audit configuration](docs/HARDENING.md). Core assets are embedded and pinned; updating the Rust application requires a reviewed rebuild. This release does not claim an automatic Rust Core adapter updater.
 
 ## Security
 
-The construction, real decoder integration and hardware trust assumptions are unqualified. Child resource/protocol limits are not an OS sandbox. Public inputs can repeat or be influenced; diagnostics and hashes are not proofs of entropy. No impossible-collision, zero-vulnerability, root-proof audit or physical-erasure claim is made.
+Read [SECURITY.md](SECURITY.md) and the [threat model](docs/THREAT-MODEL.md). The service trusts the OS RNG, host, compiler and dependencies. API transport and remote client storage add boundaries beyond using the OS RNG directly in an application.
 
-`serve --stop-if-traced` opts into polling this process's `TracerPid`. Polling may miss an attacker or interrupt legitimate debugging. No global host-security settings are modified. SIGKILL and power loss cannot run cleanup handlers. Read [SECURITY.md](SECURITY.md) and the [threat model](docs/THREAT-MODEL.md).
+No random outputs, bearer credentials, raw media or account tokens belong in logs or issues. Token revocation blocks subsequent authorizations; it cannot recall already allocated or in-flight responses. Discard the output of ambiguous allocation attempts rather than automatically treating a retry as the same request.
 
 ## Development and testing
 
 ```sh
+python3 scripts/build_ui.py
 cargo fmt --check
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked
-python3 -m pip install playwright==1.64.1
-python3 -m playwright install chromium
 python3 tests/browser_check.py
 python3 tests/browser_failure_check.py
+python3 tests/browser_admin.py
 ```
 
-Tests use deterministic samples, fake HTTP, temporary audit fixtures and an isolated RGB-emitting Python stub. They do not fetch a stream or run a real media decoder. See [validation scope](docs/VALIDATION.md). Main is protected by required GitHub Actions checks and a pull-request workflow, including administrators; force-push and deletion are disabled.
+`ui/` contains editable host pages; `static/admin.js`, `static/link.js` and `static/app.js` contain application interactions. `scripts/build_ui.py` verifies the signed pinned Core manifest and builds `static/*.html` and `src/core_assets.rs`. Shared component source and canonical templates are retained in `vendor/core/`; make shared component changes in Core first. Do not hand-edit generated or minified Core assets.
+
+Tests use fictional accounts, deterministic RNGs, mocked issuer responses and isolated temporary directories. Decoder fixtures do not run real FFmpeg or fetch live media. See [validation scope](docs/VALIDATION.md).
 
 ## Documentation
 
-[Engine design](docs/DESIGN.md) · [Local API](docs/API.md) · [Video connector](docs/VIDEO.md) · [Audit and defense](docs/HARDENING.md) · [Threat model](docs/THREAT-MODEL.md) · [TEE roadmap](docs/TEE.md) · [Validation](docs/VALIDATION.md)
+[Administration and account linking](docs/ADMINISTRATION.md) · [API](docs/API.md) · [Engine design](docs/DESIGN.md) · [Audit](docs/HARDENING.md) · [Experimental video](docs/VIDEO.md) · [Threat model](docs/THREAT-MODEL.md) · [TEE research](docs/TEE.md)
 
-## Brand artwork
-
-[SVG symbol](static/brand/entropy-mark-light.svg) · [Dark-background SVG](static/brand/entropy-mark-dark.svg) · [Transparent 512px PNG](static/brand/entropy-mark-512.png) · [Complete artwork collection](https://github.com/every-lemon/kagnode-logos)
-
-The dedicated E symbol, product wordmark and favicon set use the pinned canonical artwork. The header image links here; artwork permissions are separate from the software license.
+<a id="brand-artwork"></a>
+[SVG symbol](static/brand/entropy-mark-light.svg) · [Transparent PNG](static/brand/entropy-mark-512.png) · [Canonical artwork collection](https://github.com/every-lemon/kagnode-logos)
 
 ## Licensing
 
-Source is **AGPL-3.0-only**; see [LICENSE](LICENSE). The product SVGs and transparent favicons come from KagNode Logos, with [pinned provenance](branding.lock.json), [artwork terms](static/ARTWORK-LICENSE) and retained [outlined typography notices](static/brand/FONT-NOTICES.txt). The locally bundled Core stylesheet has [provenance](static/core/NOTICE) and a [pinned digest](core.lock.json). The interface uses system fonts.
-
-[KagNode Website](https://nebulacoder.com) · [Developer](https://developer.nebulacoder.com) · [Source](https://github.com/every-lemon/kagnode-entropy)
+Software is **AGPL-3.0-only**; see [LICENSE](LICENSE). Product artwork retains its [separate terms](static/ARTWORK-LICENSE), [pinned provenance](branding.lock.json) and [font notices](static/brand/FONT-NOTICES.txt). Imported Core source and artwork retain [license](vendor/core/LICENSE.txt), [artwork terms](vendor/core/ARTWORK-LICENSE.txt) and [version lock](core.lock.json).

@@ -4,7 +4,7 @@ use base64::{
 };
 use clap::{Args, Parser, Subcommand};
 #[cfg(not(target_os = "linux"))]
-compile_error!("This source preview currently supports Linux only.");
+compile_error!("KagNode Entropy currently supports Linux only.");
 
 use kagnode_entropy::{
     audit::{self, AuditConfig, AuditLog, Privacy},
@@ -22,7 +22,7 @@ use zeroize::Zeroizing;
 #[derive(Parser)]
 #[command(
     version,
-    about = "KagNode Entropy — Rust source preview; no assessed supplemental entropy"
+    about = "KagNode Entropy — local OS-backed randomness; optional unassessed research mode"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -30,6 +30,11 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Create a new private service configuration; never replaces existing files.
+    Init {
+        #[arg(long)]
+        directory: PathBuf,
+    },
     Sample {
         #[command(flatten)]
         common: Common,
@@ -47,6 +52,12 @@ enum Command {
         interval_ms: u64,
         #[arg(long)]
         stop_if_traced: bool,
+        /// Private credentials.json created by init.
+        #[arg(long)]
+        credentials_file: Option<PathBuf>,
+        /// Disposable local development only; tokens are printed to the terminal.
+        #[arg(long, conflicts_with = "credentials_file")]
+        ephemeral: bool,
     },
     AuditKey {
         #[arg(long)]
@@ -92,6 +103,10 @@ fn make_engine(
     common: &Common,
     capacity: usize,
 ) -> Result<Arc<Engine>, Box<dyn std::error::Error>> {
+    if common.mode == Mode::OsBacked && (common.video.video_url.is_some() || common.linux_counters)
+    {
+        return Err("Video and network observations require --mode experimental --acknowledge-experimental; production uses only the OS CSPRNG".into());
+    }
     if common.mode == Mode::Experimental && !common.acknowledge_experimental {
         return Err("Experimental output is unassessed; pass --acknowledge-experimental".into());
     }
@@ -173,6 +188,12 @@ impl VideoOptions {
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
+        Command::Init { directory } => {
+            kagnode_entropy::management::initialize(&directory)?;
+            println!(
+                "Created private configuration. Read admin.key locally; never publish it. Start with serve --credentials-file <directory>/credentials.json and open /admin."
+            );
+        }
         Command::AuditKey { path } => {
             audit::create_key(&path)?;
             println!("Created a private audit key. Keep it separate from any retained checkpoint.");
@@ -242,7 +263,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             capacity,
             interval_ms,
             stop_if_traced,
+            credentials_file,
+            ephemeral,
         } => {
+            if common.mode == Mode::OsBacked
+                && (common.video.video_url.is_some() || common.linux_counters)
+            {
+                return Err("Video/network observations are available only in acknowledged experimental mode".into());
+            }
             let source = common.video.driver()?;
             let engine = make_engine(&common, capacity as usize)?;
             if stop_if_traced
@@ -251,22 +279,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 engine.close();
                 return Err("Tracer policy stopped this instance".into());
             }
-            let mut tokens = Vec::new();
-            for id in ["preview-alice", "preview-bob"] {
-                let mut bytes = Zeroizing::new([0u8; 32]);
-                OsRandom.fill(bytes.as_mut())?;
-                tokens.push((URL_SAFE_NO_PAD.encode(bytes.as_ref()), id.to_owned()));
-            }
             let listener =
                 tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await?;
-            println!("KagNode Entropy · http://127.0.0.1:{port} · local source preview");
-            println!("Disposable local tokens (shown once; restart replaces them):");
-            for (token, id) in &tokens {
-                println!("  {id}: {token}");
-            }
+            let (registry, management) = if let Some(path) = credentials_file {
+                let registry = Arc::new(Registry::managed());
+                let management =
+                    kagnode_entropy::management::Management::load(&path, registry.clone())?;
+                println!("KagNode Entropy · http://127.0.0.1:{port} · OS-backed service");
+                (registry, Some(management))
+            } else if ephemeral {
+                let mut tokens = Vec::new();
+                for id in ["preview-alice", "preview-bob"] {
+                    let mut bytes = Zeroizing::new([0u8; 32]);
+                    OsRandom.fill(bytes.as_mut())?;
+                    tokens.push((URL_SAFE_NO_PAD.encode(bytes.as_ref()), id.to_owned()));
+                }
+                println!(
+                    "KagNode Entropy · http://127.0.0.1:{port} · ephemeral development service"
+                );
+                println!("Disposable local tokens (shown once; restart replaces them):");
+                for (token, id) in &tokens {
+                    println!("  {id}: {token}");
+                }
+                (Arc::new(Registry::new(tokens, 16.0, 32)?), None)
+            } else {
+                return Err("Use --credentials-file for service operation, or explicitly --ephemeral for disposable local development".into());
+            };
             let state = AppState {
                 engine: engine.clone(),
-                registry: Arc::new(Registry::new(tokens, 16.0, 32)?),
+                registry,
+                management,
                 port,
                 linux_counters: common.linux_counters,
                 source_status: source.status(),

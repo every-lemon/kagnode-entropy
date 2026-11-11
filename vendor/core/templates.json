@@ -1,0 +1,9 @@
+{
+  "sidebar": "<aside id=\"sidebar\" class=\"sidebar\" aria-label=\"Workspace navigation\">{{brand}}{{navigation}}{{footer}}</aside>",
+  "account-menu": "<div id=\"account-menu\" class=\"account-menu\" hidden inert><div class=\"account-identity\">{{identity}}</div>{{actions}}</div>",
+  "skeleton": "<div class=\"kn-core-skeleton\" role=\"status\" aria-label=\"Loading content\"><span></span><span></span><span></span></div>",
+  "dialog": "<dialog aria-label=\"{{label}}\"><div class=\"kn-core-dialog-content\">{{content}}</div>{{actions}}</dialog>",
+  "login-frame": "<main data-core-login data-core-login-product=\"{{product}}\"><section class=\"kn-core-login-card\"><header class=\"kn-core-login-heading\"><svg class=\"kn-core-login-mark\" viewBox=\"0 0 64 64\" aria-hidden=\"true\" focusable=\"false\"><g transform=\"scale(2)\" fill=\"#2563eb\"><path d=\"M4 18C4 9 11 4 23 5L18 27C10 28 4 25 4 18Z\"/><path d=\"m25 11 4 5-3 10-4-3Z\"/></g></svg><p class=\"kn-core-login-product\">{{product}}</p><h1>{{heading}}</h1><p>{{description}}</p></header><div class=\"kn-core-login-content\">{{content}}</div><div class=\"kn-core-login-provider\">{{provider}}</div></section></main>",
+  "login-field": "<div class=\"kn-core-login-field\">{{label}}{{control}}{{help}}</div>",
+  "login-secret": "<div class=\"kn-core-login-secret\">{{control}}{{action}}</div>"
+}

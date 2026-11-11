@@ -14,6 +14,9 @@ fn invalid_source_configuration_does_not_create_an_audit_session() {
     let rejected = Command::new(binary)
         .args([
             "sample",
+            "--mode",
+            "experimental",
+            "--acknowledge-experimental",
             "--video-url",
             "file:///fictional-not-read",
             "--audit-key-file",
@@ -39,6 +42,9 @@ fn sample_cancellation_handles_sigterm_during_a_source_retry() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_kagnode-entropy"))
         .args([
             "sample",
+            "--mode",
+            "experimental",
+            "--acknowledge-experimental",
             "--video-url",
             "https://video.example.invalid/fictional.mp4",
             "--video-decoder",

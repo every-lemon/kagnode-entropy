@@ -1,3 +1,11 @@
+# 5.0.0
+
+- Production output is unchanged OS CSPRNG bytes; public-input mixing remains experimental.
+- Add private persistent client-key management, rotation/revocation, short-lived admin sessions and CSRF/reauthentication controls.
+- Add browser-bound KagNode owner linking/sign-in with local fallback and explicit opt-out.
+- Adopt verified Core 5 canonical login, icons, sidebar and locally embedded assets.
+- Preserve historical source previews and their validation limits.
+
 # Revision history
 
 ## 0.1.0-alpha.3

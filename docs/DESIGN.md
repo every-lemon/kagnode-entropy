@@ -1,3 +1,11 @@
+# Stable OS-backed path
+
+In 5.0, production queue material is exactly the fresh 64-byte OS CSPRNG output. Production allocation returns that block unchanged. Pixel samples, timestamps, counters, client IDs and context labels do not enter a custom cryptographic output transform. The fixed test RNG deliberately repeats bytes; only queue sequence allocation, not byte-string uniqueness, is enforced.
+
+Video/network observation options are rejected in OS-backed CLI mode. The bounded producer uses a synthetic scheduling fixture without claiming entropy from it; RNG failures prevent allocation. Separate client authorization and quotas enforce API access.
+
+The remainder describes the retained experimental research construction, not production randomness.
+
 # Engine design — 0.1.0-alpha.2
 
 ## Data flow

@@ -1,4 +1,5 @@
 """Disposable local Rust preview QA. No live service, mail or real credential input."""
+
 import os
 import hashlib
 import json
@@ -11,43 +12,95 @@ import time
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
-BRAND = {item['path']: item['sha256'] for item in json.loads((ROOT / 'branding.lock.json').read_text())['files']}
-ARTIFACTS = ROOT / '.runtime' / 'browser'
+BRAND = {
+    item["path"]: item["sha256"]
+    for item in json.loads((ROOT / "branding.lock.json").read_text())["files"]
+}
+ARTIFACTS = ROOT / ".runtime" / "browser"
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 with socket.socket() as sock:
-    sock.bind(('127.0.0.1', 0))
+    sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
-process = subprocess.Popen([str(ROOT / 'target/debug/kagnode-entropy'), 'serve', '--port', str(port)],
-                           cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+process = subprocess.Popen(
+    [
+        os.environ.get("ENTROPY_BINARY", str(ROOT / "target/debug/kagnode-entropy")),
+        "serve",
+        "--ephemeral",
+        "--port",
+        str(port),
+    ],
+    cwd=ROOT,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
 try:
     token = None
     for _ in range(4):
         line = process.stdout.readline()
-        match = re.search(r'preview-alice: ([A-Za-z0-9_-]+)', line)
+        match = re.search(r"preview-alice: ([A-Za-z0-9_-]+)", line)
         if match:
             token = match.group(1)
             break
-    assert token, 'Disposable preview token was not issued'
-    bob = re.search(r'preview-bob: ([A-Za-z0-9_-]+)', process.stdout.readline()).group(1)
+    assert token, "Disposable preview token was not issued"
+    bob = re.search(r"preview-bob: ([A-Za-z0-9_-]+)", process.stdout.readline()).group(
+        1
+    )
     with sync_playwright() as p:
-        options = {'headless': True}
-        if os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE'):
-            options['executable_path'] = os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE']
-        browser = p.chromium.launch(**options)
-        for name, width, height, scheme in [('desktop', 1365, 1100, 'dark'), ('mobile', 390, 844, 'light'), ('small', 320, 740, 'dark')]:
-            context = browser.new_context(viewport={'width': width, 'height': height}, color_scheme=scheme)
+        options = {"headless": True}
+        if os.environ.get(
+            "KAGNODE_BROWSER_ENGINE", os.environ.get("BROWSER", "chromium")
+        ) == "chromium" and os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE"):
+            options["executable_path"] = os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE"]
+        if os.environ.get("KAGNODE_BROWSER_EXECUTABLE"):
+            options["executable_path"] = os.environ["KAGNODE_BROWSER_EXECUTABLE"]
+        browser = getattr(
+            p,
+            os.environ.get(
+                "KAGNODE_BROWSER_ENGINE", os.environ.get("BROWSER", "chromium")
+            ),
+        ).launch(**options)
+        for name, width, height, scheme in [
+            ("desktop", 1365, 1100, "dark"),
+            ("mobile", 390, 844, "light"),
+            ("small", 320, 740, "dark"),
+        ]:
+            context = browser.new_context(
+                viewport={"width": width, "height": height}, color_scheme=scheme
+            )
             page = context.new_page()
             errors = []
-            page.on('pageerror', lambda error: errors.append(str(error)))
-            page.goto(f'http://127.0.0.1:{port}/')
-            expect(page.locator('header .brand img')).to_have_attribute('alt', 'KagNode. Entropy')
-            assert page.locator('header .brand img').evaluate('(image) => image.complete && image.naturalWidth > 0')
-            assert page.locator('header .brand img').evaluate('(image) => image.currentSrc').endswith(f'entropy-lockup-{scheme}.svg')
-            assert page.locator('link[rel=icon][type="image/svg+xml"]').get_attribute('href') == '/brand/favicon.svg'
-            for asset in ('favicon.svg', 'favicon.png', 'favicon.ico', 'entropy-mark-512.png'):
-                response = page.request.get(f'http://127.0.0.1:{port}/brand/{asset}')
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(f"http://127.0.0.1:{port}/")
+            expect(page.locator("header .brand img")).to_have_attribute(
+                "alt", "KagNode. Entropy"
+            )
+            assert page.locator("header .brand img").evaluate(
+                "(image) => image.complete && image.naturalWidth > 0"
+            )
+            assert (
+                page.locator("header .brand img")
+                .evaluate("(image) => image.currentSrc")
+                .endswith(f"entropy-lockup-{scheme}.svg")
+            )
+            assert (
+                page.locator('link[rel=icon][type="image/svg+xml"]').get_attribute(
+                    "href"
+                )
+                == "/brand/favicon.svg"
+            )
+            for asset in (
+                "favicon.svg",
+                "favicon.png",
+                "favicon.ico",
+                "entropy-mark-512.png",
+            ):
+                response = page.request.get(f"http://127.0.0.1:{port}/brand/{asset}")
                 assert response.status == 200
-                assert hashlib.sha256(response.body()).hexdigest() == BRAND['static/brand/' + asset]
+                assert (
+                    hashlib.sha256(response.body()).hexdigest()
+                    == BRAND["static/brand/" + asset]
+                )
             alpha = page.evaluate("""() => new Promise((resolve,reject) => {
               const image = new Image(); image.onerror = reject;
               image.onload = () => {const canvas = document.createElement('canvas');
@@ -56,68 +109,69 @@ try:
                 resolve({width:image.width, height:image.height, corner:ctx.getImageData(0,0,1,1).data[3]});};
               image.src = '/brand/favicon.png';
             })""")
-            assert alpha == {'width': 32, 'height': 32, 'corner': 0}
-            page.locator('#token').fill(token)
-            page.get_by_role('button', name='Connect', exact=True).click()
-            page.locator('#dashboard').wait_for(state='visible')
-            page.get_by_role('button', name='Allocate 64 bytes').click()
-            expect(page.locator('#output')).to_have_text(re.compile(r'^[A-Za-z0-9+/]{86}==$'))
-            assert page.locator('#client-name').inner_text() == 'preview-alice'
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-            assert page.evaluate('localStorage.length === 0 && sessionStorage.length === 0')
+            assert alpha == {"width": 32, "height": 32, "corner": 0}
+            page.locator("#token").fill(token)
+            page.get_by_role("button", name="Connect", exact=True).click()
+            page.locator("#dashboard").wait_for(state="visible")
+            page.get_by_role("button", name="Allocate 64 bytes").click()
+            expect(page.locator("#output")).to_have_text(
+                re.compile(r"^[A-Za-z0-9+/]{86}==$")
+            )
+            assert page.locator("#client-name").inner_text() == "preview-alice"
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert page.evaluate(
+                "localStorage.length === 0 && sessionStorage.length === 0"
+            )
             assert not errors, errors
-            page.screenshot(path=str(ARTIFACTS / f'{name}.png'), full_page=True)
-            page.locator('#context').fill('private-fixture-context')
-            page.get_by_role('button', name='Disconnect').click()
-            assert page.locator('#dashboard').is_hidden()
-            assert page.locator('#output').inner_text() == 'No output allocated.'
-            assert page.locator('#context').input_value() == ''
-            assert page.locator('#output-status').inner_text() == ''
+            page.screenshot(path=str(ARTIFACTS / f"{name}.png"), full_page=True)
+            page.locator("#context").fill("private-fixture-context")
+            page.get_by_role("button", name="Disconnect").click()
+            assert page.locator("#dashboard").is_hidden()
+            assert page.locator("#output").inner_text() == "No output allocated."
+            assert page.locator("#context").input_value() == ""
+            assert page.locator("#output-status").inner_text() == ""
             context.close()
         # GitHub constrains README image width. A fixed height distorted the
         # published product lockup on narrow screens; render that exact markup.
-        readme_logo = re.search(r'<p align="center">.*?</p>', (ROOT / 'README.md').read_text(), re.S).group(0)
-        readme_logo = readme_logo.replace('static/brand/', '/brand/')
-        fixture = '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}.markdown-body{width:254px}.markdown-body img{max-width:100%}</style><main class="markdown-body">' + readme_logo + '</main>'
-        for scheme in ('light', 'dark'):
-            context = browser.new_context(viewport={'width':320,'height':240}, color_scheme=scheme)
+        readme_logo = re.search(
+            r'<p align="center">.*?</p>', (ROOT / "README.md").read_text(), re.S
+        ).group(0)
+        readme_logo = readme_logo.replace("static/brand/", "/brand/")
+        fixture = (
+            '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}.markdown-body{width:254px}.markdown-body img{max-width:100%}</style><main class="markdown-body">'
+            + readme_logo
+            + "</main>"
+        )
+        for scheme in ("light", "dark"):
+            context = browser.new_context(
+                viewport={"width": 320, "height": 240}, color_scheme=scheme
+            )
             page = context.new_page()
-            page.route('**/readme-preview', lambda route: route.fulfill(content_type='text/html', body=fixture))
-            page.goto(f'http://127.0.0.1:{port}/readme-preview')
-            logo = page.get_by_role('img', name='KagNode. Entropy', exact=True)
+            page.route(
+                "**/readme-preview",
+                lambda route: route.fulfill(content_type="text/html", body=fixture),
+            )
+            page.goto(f"http://127.0.0.1:{port}/readme-preview")
+            logo = page.get_by_role("img", name="KagNode. Entropy", exact=True)
             expect(logo).to_be_visible()
-            dimensions = logo.evaluate('(i) => ({width:i.getBoundingClientRect().width,height:i.getBoundingClientRect().height,src:i.currentSrc,loaded:i.complete&&i.naturalWidth>0})')
-            assert dimensions['loaded'] and dimensions['src'].endswith('entropy-lockup-' + scheme + '.svg')
-            assert dimensions['width'] == 254 and abs(dimensions['width']/dimensions['height'] - 304/96) < .03, dimensions
+            dimensions = logo.evaluate(
+                "(i) => ({width:i.getBoundingClientRect().width,height:i.getBoundingClientRect().height,src:i.currentSrc,loaded:i.complete&&i.naturalWidth>0})"
+            )
+            assert dimensions["loaded"] and dimensions["src"].endswith(
+                "entropy-lockup-" + scheme + ".svg"
+            )
+            assert (
+                dimensions["width"] == 254
+                and abs(dimensions["width"] / dimensions["height"] - 304 / 96) < 0.03
+            ), dimensions
             context.close()
         # A late response from the disconnected identity must not restore output.
         context = browser.new_context()
         page = context.new_page()
-        page.goto(f'http://127.0.0.1:{port}/')
-        page.locator('#token').fill(token)
-        page.get_by_role('button', name='Connect', exact=True).click()
-        page.locator('#dashboard').wait_for(state='visible')
-        page.evaluate('''() => {
-          const realFetch = window.fetch;
-          window.fetch = async (...args) => {
-            const response = await realFetch(...args);
-            if (String(args[0]).endsWith('/bytes')) await new Promise(resolve => setTimeout(resolve, 500));
-            return response;
-          };
-        }''')
-        page.get_by_role('button', name='Allocate 64 bytes').click()
-        page.get_by_role('button', name='Disconnect').click()
-        page.wait_for_timeout(700)
-        assert page.locator('#dashboard').is_hidden()
-        assert page.locator('#output').inner_text() == 'No output allocated.'
-        context.close()
-        # Clear output also wins against a delayed response in the same identity.
-        context = browser.new_context()
-        page = context.new_page()
-        page.goto(f'http://127.0.0.1:{port}/')
-        page.locator('#token').fill(token)
-        page.get_by_role('button', name='Connect', exact=True).click()
-        page.locator('#dashboard').wait_for(state='visible')
+        page.goto(f"http://127.0.0.1:{port}/")
+        page.locator("#token").fill(token)
+        page.get_by_role("button", name="Connect", exact=True).click()
+        page.locator("#dashboard").wait_for(state="visible")
         page.evaluate("""() => {
           const realFetch = window.fetch;
           window.fetch = async (...args) => {
@@ -126,29 +180,56 @@ try:
             return response;
           };
         }""")
-        page.get_by_role('button', name='Allocate 64 bytes').click()
-        page.get_by_role('button', name='Clear output').click()
+        page.get_by_role("button", name="Allocate 64 bytes").click()
+        page.get_by_role("button", name="Disconnect").click()
         page.wait_for_timeout(700)
-        assert page.locator('#output').inner_text() == 'No output allocated.'
-        assert page.locator('#output-status').inner_text() == ''
+        assert page.locator("#dashboard").is_hidden()
+        assert page.locator("#output").inner_text() == "No output allocated."
+        context.close()
+        # Clear output also wins against a delayed response in the same identity.
+        context = browser.new_context()
+        page = context.new_page()
+        page.goto(f"http://127.0.0.1:{port}/")
+        page.locator("#token").fill(token)
+        page.get_by_role("button", name="Connect", exact=True).click()
+        page.locator("#dashboard").wait_for(state="visible")
+        page.evaluate("""() => {
+          const realFetch = window.fetch;
+          window.fetch = async (...args) => {
+            const response = await realFetch(...args);
+            if (String(args[0]).endsWith('/bytes')) await new Promise(resolve => setTimeout(resolve, 500));
+            return response;
+          };
+        }""")
+        page.get_by_role("button", name="Allocate 64 bytes").click()
+        page.get_by_role("button", name="Clear output").click()
+        page.wait_for_timeout(700)
+        assert page.locator("#output").inner_text() == "No output allocated."
+        assert page.locator("#output-status").inner_text() == ""
         # A framework/proxy plain-text error gets actionable feedback, no retry.
         requests = []
+
         def plain_error(route):
             requests.append(1)
-            route.fulfill(status=503, content_type='text/plain', body='fixture failure')
-        page.route('**/api/v1/bytes', plain_error)
-        page.get_by_role('button', name='Allocate 64 bytes').click()
-        expect(page.locator('#output-status')).to_contain_text('unexpected response (503)')
+            route.fulfill(status=503, content_type="text/plain", body="fixture failure")
+
+        page.route("**/api/v1/bytes", plain_error)
+        page.get_by_role("button", name="Allocate 64 bytes").click()
+        expect(page.locator("#output-status")).to_contain_text(
+            "unexpected response (503)"
+        )
         assert len(requests) == 1
         context.close()
         # Pending work belongs to its original session, even if a transport ignores abort.
         context = browser.new_context()
         page = context.new_page()
-        page.add_init_script('window.setInterval = fn => {window.fixturePoll = fn; return 1}')
-        page.goto(f'http://127.0.0.1:{port}/')
-        page.locator('#token').fill(token)
-        page.get_by_role('button', name='Connect', exact=True).click()
-        page.locator('#dashboard').wait_for(state='visible')
+        page.add_init_script(
+            "const fixtureInterval = window.setInterval; window.setInterval = (fn, delay, ...args) => {if(delay === 4000){window.fixturePoll = fn; return 1;} return fixtureInterval(fn, delay, ...args)}"
+        )
+        page.goto(f"http://127.0.0.1:{port}/")
+        page.locator("#token").fill(token)
+        page.get_by_role("button", name="Connect", exact=True).click()
+        page.locator("#dashboard").wait_for(state="visible")
         # An older status response cannot roll the dashboard back.
         page.evaluate("""() => {
           window.fixtureFetch = fetch; window.statusSequence = 0; window.pendingStatus = [];
@@ -160,13 +241,15 @@ try:
           };
           window.fixturePoll(); window.fixturePoll();
         }""")
-        page.wait_for_function('() => typeof pendingStatus[0] === "function" && typeof pendingStatus[1] === "function"')
-        page.evaluate('pendingStatus[1]()')
-        expect(page.locator('#produced')).to_have_text('202')
-        page.evaluate('pendingStatus[0]()')
+        page.wait_for_function(
+            '() => typeof pendingStatus[0] === "function" && typeof pendingStatus[1] === "function"'
+        )
+        page.evaluate("pendingStatus[1]()")
+        expect(page.locator("#produced")).to_have_text("202")
+        page.evaluate("pendingStatus[0]()")
         page.wait_for_timeout(100)
-        expect(page.locator('#produced')).to_have_text('202')
-        page.evaluate('window.fetch = window.fixtureFetch')
+        expect(page.locator("#produced")).to_have_text("202")
+        page.evaluate("window.fetch = window.fixtureFetch")
         page.evaluate("""() => {
           const real = fetch; window.pendingAllocations = [];
           window.fetch = async (...args) => {
@@ -175,37 +258,66 @@ try:
             return response;
           };
         }""")
-        page.locator('#consume').click()
-        page.wait_for_function('() => pendingAllocations.length === 1')
-        page.locator('#disconnect').click()
-        page.locator('#token').fill(bob)
-        page.get_by_role('button', name='Connect', exact=True).click()
-        page.locator('#dashboard').wait_for(state='visible')
-        expect(page.locator('#client-name')).to_have_text('preview-bob')
-        expect(page.locator('#consume')).to_be_enabled(timeout=1000)
-        page.locator('#consume').click()
-        page.wait_for_function('() => pendingAllocations.length === 2')
-        page.evaluate('pendingAllocations[0]()')
+        page.locator("#consume").click()
+        page.wait_for_function("() => pendingAllocations.length === 1")
+        page.locator("#disconnect").click()
+        page.locator("#token").fill(bob)
+        page.get_by_role("button", name="Connect", exact=True).click()
+        page.locator("#dashboard").wait_for(state="visible")
+        expect(page.locator("#client-name")).to_have_text("preview-bob")
+        expect(page.locator("#consume")).to_be_enabled(timeout=1000)
+        page.locator("#consume").click()
+        page.wait_for_function("() => pendingAllocations.length === 2")
+        page.evaluate("pendingAllocations[0]()")
         page.wait_for_timeout(100)
-        expect(page.locator('#consume')).to_be_disabled()
-        expect(page.locator('#output')).to_have_text('No output allocated.')
-        page.evaluate('pendingAllocations[1]()')
-        expect(page.locator('#output-status')).to_contain_text('preview-bob')
-        expect(page.locator('#consume')).to_be_enabled()
+        expect(page.locator("#consume")).to_be_disabled()
+        expect(page.locator("#output")).to_have_text("No output allocated.")
+        page.evaluate("pendingAllocations[1]()")
+        expect(page.locator("#output-status")).to_contain_text("preview-bob")
+        expect(page.locator("#consume")).to_be_enabled()
         # A stale poll error cannot replace the disconnected status.
         page.evaluate("""() => {
           window.fetch = () => new Promise((resolve, reject) => window.rejectStatus = reject);
           window.fixturePoll();
         }""")
         page.wait_for_function('() => typeof rejectStatus === "function"')
-        page.locator('#disconnect').click()
+        page.locator("#disconnect").click()
         page.evaluate('rejectStatus(new Error("fictional transport failure"))')
         page.wait_for_timeout(100)
-        expect(page.locator('#connection-status')).to_contain_text('Disconnected.')
-        assert page.locator('#dashboard').is_hidden()
+        expect(page.locator("#connection-status")).to_contain_text("Disconnected.")
+        assert page.locator("#dashboard").is_hidden()
+        context.close()
+        # Revocation clears current client output/credentials and restores the
+        # connection form; an older request cannot disconnect a replacement.
+        context = browser.new_context()
+        page = context.new_page()
+        page.add_init_script(
+            "const originalInterval=setInterval;window.setInterval=(fn,delay,...args)=>{if(delay===4000){window.fixturePoll=fn;return 1;}return originalInterval(fn,delay,...args)}"
+        )
+        page.goto(f"http://127.0.0.1:{port}/")
+        page.locator("#token").fill(token)
+        page.get_by_role("button", name="Connect", exact=True).click()
+        page.locator("#dashboard").wait_for(state="visible")
+        page.route(
+            "**/api/v1/status",
+            lambda route: route.fulfill(
+                status=401,
+                content_type="application/json",
+                body='{"error":{"message":"revoked"}}',
+            ),
+        )
+        page.evaluate("window.fixturePoll()")
+        expect(page.locator("#connect-form")).to_be_visible()
+        expect(page.locator("#connection-status")).to_contain_text(
+            "expired or was revoked"
+        )
+        expect(page.locator("#output")).to_have_text("No output allocated.")
+        expect(page.locator("#connect-form button")).to_be_enabled()
         context.close()
         browser.close()
-    print('Browser QA passed: desktop/mobile/small, both themes, canonical logo/favicon bytes, allocation, session replacement, ordered status, late failures, no overflow or persistent token storage.')
+    print(
+        "Browser QA passed: desktop/mobile/small, both themes, canonical logo/favicon bytes, allocation, session replacement, ordered status, late failures, no overflow or persistent token storage."
+    )
 finally:
     process.send_signal(signal.SIGTERM)
     try:
@@ -213,4 +325,4 @@ finally:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
-    assert process.returncode == 0, 'Preview did not shut down cleanly'
+    assert process.returncode == 0, "Preview did not shut down cleanly"

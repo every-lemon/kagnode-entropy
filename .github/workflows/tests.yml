@@ -6,9 +6,22 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Install Rust components
         run: rustup component add rustfmt clippy
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Editable source formatting
+        run: |
+          python3 -m pip install ruff==0.14.4
+          python3 -m ruff format --check scripts tests/*.py
+          python3 -m ruff check --select E9,F63,F7,F82 scripts tests/*.py
+          npx --yes prettier@3.7.4 --check ui/*.html static/admin.js static/link.js static/app.js static/app.css
+      - name: Verify generated Core UI
+        run: |
+          python3 scripts/build_ui.py
+          git diff --exit-code
       - run: cargo fmt --check
       - run: cargo test --locked
       - run: cargo clippy --locked --all-targets -- -D warnings
@@ -16,6 +29,14 @@ jobs:
       - name: Install browser QA
         run: |
           python3 -m pip install playwright==1.64.1
-          python3 -m playwright install --with-deps chromium
+          python3 -m playwright install --with-deps chromium webkit
       - run: python3 tests/browser_check.py
       - run: python3 tests/browser_failure_check.py
+      - run: python3 tests/browser_admin.py
+      - name: WebKit browser acceptance
+        env:
+          BROWSER: webkit
+        run: |
+          python3 tests/browser_check.py
+          python3 tests/browser_failure_check.py
+          python3 tests/browser_admin.py

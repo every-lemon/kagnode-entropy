@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KagNode Entropy · Administration</title>
+    <link rel="icon" href="/brand/favicon.svg" />
+    <link rel="stylesheet" href="/app.css" />
+    <script src="/admin.js" defer></script>
+  <meta name="kagnode-core" content='{"app":"entropy","version":"5.0.2","authenticated":false}'><script src="/kagnode-core/5.0.2/theme.59858a18c8bbcee2.js"></script><link rel="stylesheet" href="/kagnode-core/5.0.2/core.fd96e4249774ebfb.css"><script src="/kagnode-core/5.0.2/core.dd5ec8f483938e61.js" defer></script></head>
+  <body>
+    <div id="main">
+      <main id="admin-login" data-core-login data-core-login-product="KagNode. Entropy"><section class="kn-core-login-card"><header class="kn-core-login-heading"><svg class="kn-core-login-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g transform="scale(2)" fill="#2563eb"><path d="M4 18C4 9 11 4 23 5L18 27C10 28 4 25 4 18Z"/><path d="m25 11 4 5-3 10-4-3Z"/></g></svg><p class="kn-core-login-product">KagNode. Entropy</p><h1>Sign in</h1><p>Manage your local Entropy service.</p></header><div class="kn-core-login-content"><form id="admin-login-form"><label for="credential">Administrator key</label><input id="credential" type="password" required autocomplete="current-password" maxlength="128"><button type="submit"><span data-core-icon="lock"></span>Sign in</button></form><p id="login-message" role="status"></p></div><div class="kn-core-login-provider" hidden><button type="button" data-core-login-provider hidden><span data-core-icon="account"></span>Login with KagNode</button><p data-core-login-status role="status"></p></div></section></main>
+      <section id="admin-panel" hidden>
+        <aside id="sidebar" class="sidebar" aria-label="Workspace navigation"><a class="brand" href="/admin"><img src="/brand/favicon.svg" width="32" height="32" alt=""><span class="brand-copy"><strong>KagNode.</strong><small>Entropy</small></span></a><nav class="sidebar-nav"><a href="/admin" aria-current="page"><span data-core-icon="observability"></span><span class="nav-label">Overview</span></a><a href="#client-form"><span data-core-icon="key"></span><span class="nav-label">Client access</span></a><a href="#account-settings"><span data-core-icon="account"></span><span class="nav-label">Account</span></a><a href="/"><span data-core-icon="flask"></span><span class="nav-label">API explorer</span></a></nav></aside>
+        <main class="workspace">
+          <div class="section-heading">
+            <h1>Service administration</h1>
+            <button data-account-menu aria-label="Account"><span class="avatar"><img id="owner-photo" alt="" hidden><span id="owner-initial">E</span></span></button><div id="account-menu" class="account-menu" hidden inert><div class="account-identity"><strong id="owner-name">Local administrator</strong><small id="owner-email"></small></div><a href="#account-settings"><span data-core-icon="account"></span>Account settings</a><button id="signout" type="button"><span data-core-icon="lock"></span>Sign out</button></div>
+          </div>
+          <p id="message" role="status"></p>
+          <section class="card">
+            <h2>Service health</h2>
+            <pre id="health"></pre>
+            <p>
+              Quota: 16 blocks/second per client, with a burst of 32. Each block
+              contains 64 bytes.
+            </p>
+          </section>
+          <section class="card">
+            <h2>Client access</h2>
+            <p>
+              Create, rotate or revoke API credentials. Your administrator key
+              is required to confirm each change. API credentials cannot
+              administer this service.
+            </p>
+            <form id="client-form">
+              <label for="client-id">Client ID</label
+              ><input
+                id="client-id"
+                required
+                maxlength="64"
+                pattern="[A-Za-z0-9_.-]+"
+              /><label for="action">Action</label
+              ><select id="action">
+                <option value="create">Create</option>
+                <option value="rotate">Rotate credential</option>
+                <option value="revoke">Revoke</option></select
+              ><label for="confirm-key">Administrator key</label
+              ><input
+                id="confirm-key"
+                type="password"
+                required
+                autocomplete="current-password"
+                maxlength="128"
+              /><button type="submit">Apply change</button>
+            </form>
+            <p>
+              New credentials appear once. Save them securely before leaving
+              this page.
+            </p>
+            <pre id="new-token" aria-live="polite"></pre>
+            <button id="clear-token" type="button">Clear credential</button>
+            <h3>Authorized clients</h3>
+            <ul id="clients"></ul>
+          </section>
+          <section class="card" id="account-settings">
+            <h2>Account and appearance</h2>
+            <label for="appearance">Appearance on this browser</label
+            ><select id="appearance">
+              <option value="system">System</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+            <label for="scroll-mode">Scrolling on this browser</label>
+            <select id="scroll-mode">
+              <option value="custom">KagNode scrolling</option>
+              <option value="native">Native scrolling</option>
+            </select>
+            <p id="owner-profile">Local administrator</p>
+            <a href="/admin/link">Connect or change KagNode Account</a>
+            <p>
+              KagNode sign-in is limited to the explicitly linked owner. Local
+              administrator-key sign-in remains available.
+            </p>
+            <form id="policy-form">
+              <label for="sync-policy">KagNode Account</label
+              ><select id="sync-policy">
+                <option value="on">Enabled</option>
+                <option value="off">Disabled</option>
+                <option value="unlink">Disconnect owner</option></select
+              ><label for="policy-key">Administrator key</label
+              ><input
+                id="policy-key"
+                type="password"
+                required
+                autocomplete="current-password"
+              /><button type="submit">Update account setting</button>
+            </form>
+          </section>
+          <section class="card">
+            <h2>Recent administrative events</h2>
+            <p>
+              Current-process metadata only. No generated bytes or credentials
+              are recorded.
+            </p>
+            <ul id="events"></ul>
+          </section>
+        </main>
+      </section>
+    </div>
+  </body>
+</html>

@@ -1,10 +1,10 @@
 # Threat model
 
-This source preview is intended for inspection and pipeline experiments. Its downstream security purpose has not been specified. It is not an independently reviewed DRBG, entropy appliance, cloud service or compliance-certified product.
+The stable service distributes unchanged OS cryptographic RNG bytes over a bounded authenticated loopback interface. Supplemental-input processing is a separate, explicitly experimental research mode. This is not an independently assessed entropy appliance or compliance-certified product.
 
 ## Trust and adversaries
 
-OS-backed mode trusts the host OS, its RNG, the Rust toolchain, dependencies and this implementation. Assume an adversary can observe or influence public video, timing and network traffic, call the local API without credentials, race consumers or exhaust request budgets. Do not assume the supplemental observations are independent.
+OS-backed mode trusts the host OS, its RNG, the Rust toolchain, dependencies and service access controls. Public observations do not enter stable output. Assume an adversary can observe or influence public video, timing and network traffic, call the local API without credentials, race consumers or exhaust request budgets. Do not assume the supplemental observations are independent.
 
 The opt-in video connector introduces an HTTP/TLS and multimedia-decoder attack surface. Protocol restrictions, process limits and child cleanup are not a security sandbox; real decoder/host isolation is unqualified.
 
@@ -14,7 +14,7 @@ The ordinary process cannot protect keys against a compromised kernel, root, a d
 
 | Proposed claim | Supported statement |
 | --- | --- |
-| Avoid all PRNG predictability | OS-backed mode relies on the OS CSPRNG; experimental mixing is not a substitute for an assessed source. |
+| Avoid all PRNG predictability | Production distributes OS CSPRNG bytes unchanged; experimental mixing is not a substitute for an assessed source. |
 | HMAC creates entropy from public video | Hashing can condition inputs; it does not establish their unpredictability. Claimed supplemental entropy is zero bits. |
 | Absolute historical security after full RAM compromise | Independent rekey/output labels avoid exposing the next key as output, but this composition has no such proof. Queued chunks and in-flight outputs remain sensitive. |
 | `popleft()` instantly physically deletes data | Allocation removes one owned queue entry. Selected owned buffers are zeroized; copies, hardware and downstream buffers are not comprehensively erased. |

@@ -1,4 +1,4 @@
-//! KagNode Entropy source preview. No assessed supplemental entropy credit.
+//! KagNode Entropy: OS-backed local service; unassessed supplemental research is separate.
 pub mod audit;
 pub mod crypto;
 pub mod defense;
@@ -10,3 +10,7 @@ pub mod tee;
 
 pub mod video;
 pub mod video_http;
+
+pub mod management;
+
+mod core_assets;

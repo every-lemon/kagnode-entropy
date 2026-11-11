@@ -1,12 +1,12 @@
-# Local preview API
+# Local service API
 
-`kagnode-entropy serve` listens only on IPv4 loopback, default port 8098. It is not a public production server or a deployed KagNode cloud service. All API responses use `Cache-Control: no-store`; CORS is not enabled. Host must match the local URL, and any supplied Origin must match that same HTTP origin. Query strings and transfer encoding are rejected.
+`kagnode-entropy serve --credentials-file DIRECTORY/credentials.json` listens only on IPv4 loopback, default port 8098. Its stable scope is a local OS-backed service, not an internet-facing or hosted KagNode cloud endpoint. All API responses use `Cache-Control: no-store`; CORS is not enabled. Host must match the local URL, and any supplied Origin must match that same HTTP origin. Query strings and transfer encoding are rejected.
 
 ## Authentication
 
-The CLI prints two disposable bearer tokens, each bound to one fixed identity. Send `Authorization: Bearer TOKEN`. Do not put tokens in URLs, source repositories, logs or browser persistent storage. Client identity cannot be supplied in request JSON. Restart invalidates all tokens. There is no token-management or account-integration service in this preview.
+Create persistent client credentials in the separate administrator console. Disposable development mode (`serve --ephemeral`) instead prints temporary bearer credentials. Send `Authorization: Bearer TOKEN`. Do not put tokens in URLs, source repositories, logs or browser persistent storage. Client identity cannot be supplied in request JSON. Configured client hashes survive restart; ephemeral tokens do not. [Administration](ADMINISTRATION.md) documents the separate cookie/CSRF boundary and explicit owner linking.
 
-`GET /health` is public and identifies the compiled package version, source-preview status and the absence of trusted execution. It is a liveness response, not proof that a source can supply frames. Static assets are public on the loopback listener.
+`GET /health` is public and identifies the compiled package version, service status and the absence of trusted execution. It is a liveness response, not proof that a source can supply frames. Static assets are public on the loopback listener.
 
 `GET /api/v1/status` requires authentication and returns the client's identity, mode, capacity, queued/produced/consumed counts, producer failure state, audit-enabled state, zero claimed supplemental entropy bits and `trusted_execution: "none: ordinary process"`. It also returns `source_status` with kind/state, geometry, accepted-frame/start/failure counts and a fixed error code. It never returns secret key, S3, queue material, source frames, configured source URL, decoder path or audit key. Exhausted video failures keep status available while allocations return 503.
 

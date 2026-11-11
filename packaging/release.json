@@ -1,0 +1,10 @@
+{
+  "repository": "kagnode-entropy",
+  "version_file": "Cargo.toml",
+  "version_pattern": "(?m)^version = \"([^\"\\n]+)\"",
+  "kind": "source",
+  "license": "AGPL-3.0-only",
+  "revision": 1,
+  "channel": "stable",
+  "upgrade_fixture_version": "0.1.0-alpha.3"
+}

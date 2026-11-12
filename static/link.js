@@ -10,12 +10,21 @@ async function api(path, body) {
   });
   const value = await response.json();
   if (!response.ok)
-    throw new Error(
-      "Sign in locally before linking, and confirm your administrator key.",
+    throw Object.assign(
+      new Error(
+        value.error?.message ||
+          "Sign in locally before linking, and confirm your administrator key.",
+      ),
+      { code: value.error?.code },
     );
   return value;
 }
 window.KagNodeLoginHost = {
+  state: () => ({
+    ready: true,
+    enabled: true,
+    issuer: "https://nebulacoder.com",
+  }),
   async request(action, payload) {
     if (action === "start") {
       const session = await api("status");
@@ -25,7 +34,16 @@ window.KagNodeLoginHost = {
       if (!credential) throw new Error("Administrator key required");
       return api("kagnode/start", { credential });
     }
-    return api("kagnode/" + (action === "status" ? "poll" : "cancel"), payload);
+    try {
+      return await api(
+        "kagnode/" + (action === "status" ? "poll" : "cancel"),
+        payload,
+      );
+    } catch (error) {
+      if (action === "status" && error.code === "authorization_denied")
+        return { pending: false, authorized: false };
+      throw error;
+    }
   },
   async complete() {
     location.assign("/admin");
@@ -37,3 +55,5 @@ document
     event.preventDefault();
     document.querySelector("[data-core-login-provider]").click();
   });
+
+document.dispatchEvent(new Event("kagnode:login-ready"));

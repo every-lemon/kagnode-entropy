@@ -4,7 +4,7 @@ KagNode Entropy 5 distributes unchanged bytes from the host operating system's c
 
 The supplemental video/timing mixer is explicitly experimental and must not supply production keys, passwords, regulated sampling or other applications requiring assessed randomness. No min-entropy assessment or cryptographic certification is claimed. Enclave profiles are research-only; they do not provide runtime attestation or secret release.
 
-Admin sessions are separate from consumer credentials. Protect the private administrator directory, its local recovery key and backups. KagNode Account sign-in requires explicit owner linking and a fresh browser-bound approval; email and role claims cannot create an administrator. Local sign-in remains independent.
+Admin sessions are separate from consumer credentials. Protect the private administrator directory, its local recovery key and backups. KagNode Account sign-in requires explicit owner linking and a fresh browser-bound same-tab approval with S256 PKCE, one-use state and an exact issuer-validated callback; email and role claims cannot create an administrator. Local sign-in remains independent.
 
 Do not include generated output, credentials, audit keys, raw frames, memory dumps or user data in public reports. Report non-sensitive defects with fictional reproductions. Use GitHub private vulnerability reporting when enabled; no private response SLA is promised.
 

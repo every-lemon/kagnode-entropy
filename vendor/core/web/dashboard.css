@@ -172,3 +172,40 @@
     gap: 12px;
   }
 }
+
+/* The home search opens the same authorized quick search as Ctrl/Cmd+K. */
+html[data-kn-core] a.core-home-search {
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--kn-muted);
+  background: var(--kn-panel);
+  border-color: var(--kn-line);
+  text-decoration: none;
+  text-align: left;
+  min-height: 54px;
+}
+a.core-home-search > span {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+}
+a.core-home-search kbd {
+  flex: none;
+  margin: 0 10px;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+a.core-home-search:hover {
+  color: var(--kn-text);
+  border-color: var(--kn-muted);
+}
+a.core-home-search:focus-visible {
+  outline: 2px solid var(--kn-focus);
+  outline-offset: 3px;
+}
+@media (max-width: 480px) {
+  a.core-home-search kbd {
+    display: none;
+  }
+}

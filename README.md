@@ -10,7 +10,7 @@ The locally served web interface provides a client API explorer and a separate a
 
 ## Release status
 
-**5.0.0** is the coordinated stable source release. Linux · AGPL-3.0-only.
+**5.0.1** is the coordinated stable source patch, adding same-tab KagNode sign-in. Linux · AGPL-3.0-only.
 
 Stable scope is the OS-backed local service, its API and administration. Supplemental-input experiments remain explicitly experimental. Video/decoder, enclave and hardware qualification are outside this release. No entropy-source assessment, cryptographic certification or compromised-host protection is claimed.
 

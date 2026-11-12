@@ -79,7 +79,10 @@ async function api(path, body) {
       notify(value.error?.message || "Session expired. Sign in again.");
     }
     if (!response.ok)
-      throw new Error(value.error?.message || "Request failed.");
+      throw Object.assign(
+        new Error(value.error?.message || "Request failed."),
+        { code: value.error?.code },
+      );
     return value;
   } catch (error) {
     if (requestEpoch !== epoch) error.stale = true;
@@ -210,27 +213,55 @@ document.addEventListener("visibilitychange", () => {
     });
 });
 refresh().catch(() => {});
+let providerReady = false,
+  providerEnabled = false;
 window.KagNodeLoginHost = {
+  state: () => ({
+    ready: providerReady,
+    enabled: providerEnabled,
+    issuer: "https://nebulacoder.com",
+  }),
   async request(action, payload) {
     if (action === "start") epoch++;
-    return api(
-      "kagnode/" + (action === "status" ? "poll" : action),
-      action === "start" ? {} : payload,
-    );
+    try {
+      return await api(
+        "kagnode/" + (action === "status" ? "poll" : action),
+        action === "start" ? {} : payload,
+      );
+    } catch (error) {
+      if (action === "status" && error.code === "authorization_denied")
+        return { pending: false, authorized: false };
+      throw error;
+    }
   },
   async complete(value) {
+    // Initial anonymous status requests must not invalidate the newly confirmed session.
+    epoch++;
     csrf = value.csrf;
     await refresh();
   },
 };
 fetch("/api/v1/admin/kagnode/availability", { cache: "no-store" })
-  .then((r) => r.json())
+  .then((r) => {
+    if (!r.ok) throw new Error("Connection status unavailable");
+    return r.json();
+  })
   .then((value) => {
     const provider = document.querySelector("[data-core-login-provider]");
+    providerEnabled = !!value.enabled;
+    providerReady = true;
     provider.hidden = !value.enabled;
     provider.closest(".kn-core-login-provider").hidden = !value.enabled;
+    window.KagNodeLogin?.refresh?.();
+    document.dispatchEvent(new Event("kagnode:login-ready"));
   })
-  .catch(() => {});
+  .catch(() => {
+    providerReady = true;
+    providerEnabled = false;
+    notify("KagNode sign-in is unavailable. You can use your local key.");
+    window.KagNodeLogin?.refresh?.();
+    document.dispatchEvent(new Event("kagnode:login-ready"));
+  });
 $("#policy-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = event.submitter;

@@ -1,5 +1,6 @@
 #[path = "account.rs"]
 mod account;
+pub(crate) use account::browser_query_allowed;
 // Local administration is separate from consumer bearer credentials. No outputs
 // or credential plaintext are stored in the administrative event ring.
 use crate::server::{AppState, Client, Registry};

@@ -140,6 +140,50 @@
     root.dataset.corePublic = "true";
     return aside;
   }
+  function installFolders() {
+    if (!sidebar || sidebar.dataset.coreFoldersReady) return;
+    const container = $("[data-core-nav-root]", sidebar);
+    const folders = all("[data-core-nav-folder]", sidebar);
+    if (!container || !folders.length) return;
+    sidebar.dataset.coreFoldersReady = "true";
+    let opener;
+    function show(name, focus = false) {
+      const folder = folders.find((el) => el.dataset.coreNavFolder === name);
+      container.hidden = !!folder;
+      folders.forEach((el) => {
+        el.hidden = el !== folder;
+      });
+      all("[data-core-nav-open]", sidebar).forEach((button) => {
+        button.setAttribute(
+          "aria-expanded",
+          String(!!folder && button.dataset.coreNavOpen === name),
+        );
+      });
+      if (focus) {
+        if (root.dataset.coreCollapsed === "true") setCollapsed(false);
+        (folder
+          ? $("[data-core-nav-back]", folder)
+          : opener || $("[data-core-nav-open]", container)
+        )?.focus({
+          preventScroll: true,
+        });
+      }
+      window.KagNodeScroll?.refresh(sidebar);
+    }
+    sidebar.addEventListener("click", (event) => {
+      const open = event.target.closest("[data-core-nav-open]");
+      const back = event.target.closest("[data-core-nav-back]");
+      if (open) {
+        event.preventDefault();
+        opener = open;
+        show(open.dataset.coreNavOpen, true);
+      } else if (back) {
+        event.preventDefault();
+        show("", true);
+      }
+    });
+    show(sidebar.dataset.coreNavDefault || "");
+  }
   function shellActive() {
     if (!sidebar) return;
     const visible =
@@ -204,7 +248,8 @@
   }
   function installSidebar() {
     sidebar = $("#sidebar,.sidebar");
-    if (!sidebar && config.publicNavigation) sidebar = publicSidebar();
+    if (!sidebar && config.publicNavigation && !$("[data-core-auth-page]"))
+      sidebar = publicSidebar();
     if (!sidebar || sidebar.dataset.coreSidebar) return;
     sidebar.dataset.coreSidebar = "true";
     sidebar.setAttribute(
@@ -545,6 +590,11 @@
         if (link.dataset.coreIconReady) continue;
         const label =
           link.getAttribute("aria-label") || link.textContent.trim();
+        if (link.hasAttribute("data-core-brand-link")) {
+          link.dataset.coreIconReady = "true";
+          link.dataset.coreTooltip = label;
+          continue;
+        }
         const explicit = $("svg[data-core-icon-name]", link)?.dataset
           .coreIconName;
         const choices = [
@@ -839,6 +889,7 @@
     },
   };
   installSidebar();
+  installFolders();
   normalize();
   window.KagNodeTheme?.setSession({
     authenticated: !!config.authenticated,

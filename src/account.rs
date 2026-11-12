@@ -20,7 +20,12 @@ pub(super) struct Owner {
 pub(super) struct Attempt {
     browser: [u8; 32],
     nonce: String,
-    device: String,
+    request: String,
+    state: String,
+    verifier: Zeroizing<String>,
+    code: Zeroizing<String>,
+    denied: bool,
+    installation: String,
     started: f64,
     until: Instant,
     polled: Instant,
@@ -44,6 +49,10 @@ thread_local! { static REMOTE_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>
 thread_local! { static RESPONSES: std::cell::RefCell<std::collections::VecDeque<Value>> = const { std::cell::RefCell::new(std::collections::VecDeque::new()) }; }
 #[cfg(test)]
 async fn remote(_endpoint: &str, _body: Option<Value>, _bearer: Option<&str>) -> Result<Value, ()> {
+    let base = TEST_TRANSPORT.with(|v| v.borrow().clone());
+    if let Some(base) = base {
+        return remote_http(_endpoint, _body, _bearer, &base).await;
+    }
     REMOTE_HOOK.with(|v| {
         if let Some(hook) = v.borrow_mut().take() {
             hook();
@@ -55,14 +64,24 @@ async fn remote(_endpoint: &str, _body: Option<Value>, _bearer: Option<&str>) ->
     }
     Ok(value)
 }
+#[cfg(test)]
+thread_local! {static TEST_TRANSPORT:std::cell::RefCell<Option<String>>=const {std::cell::RefCell::new(None)};}
 #[cfg(not(test))]
 async fn remote(endpoint: &str, body: Option<Value>, bearer: Option<&str>) -> Result<Value, ()> {
+    remote_http(endpoint, body, bearer, ISSUER).await
+}
+async fn remote_http(
+    endpoint: &str,
+    body: Option<Value>,
+    bearer: Option<&str>,
+    base: &str,
+) -> Result<Value, ()> {
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(7))
         .build()
         .map_err(|_| ())?;
-    let url = format!("{ISSUER}/api/v1/account-sync/{endpoint}");
+    let url = format!("{base}/api/v1/account-sync/{endpoint}");
     let mut request = if let Some(body) = body {
         client
             .post(url)
@@ -126,10 +145,23 @@ async fn start(
     if !admin.is_healthy() {
         return unavailable();
     }
-    let (Ok(cookie), Ok(nonce)) = (secret(), secret()) else {
+    let (Ok(cookie), Ok(nonce), Ok(oauth_state), Ok(verifier)) =
+        (secret(), secret(), secret(), secret())
+    else {
         return error(StatusCode::SERVICE_UNAVAILABLE);
     };
-    let installation = format!("http://127.0.0.1:{}", state.port);
+    let verifier = Zeroizing::new(verifier);
+    let Some(host) = headers
+        .get(header::HOST)
+        .and_then(|v| v.to_str().ok())
+        .filter(|h| {
+            *h == format!("127.0.0.1:{}", state.port) || *h == format!("localhost:{}", state.port)
+        })
+    else {
+        return error(StatusCode::FORBIDDEN);
+    };
+    let installation = format!("http://{host}");
+    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     let (link, generation) = {
         let Ok(mut store) = admin.store.lock() else {
             return error(StatusCode::SERVICE_UNAVAILABLE);
@@ -158,7 +190,12 @@ async fn start(
         store.attempts.push(Attempt {
             browser: digest(&cookie),
             nonce: nonce.clone(),
-            device: String::new(),
+            request: String::new(),
+            state: oauth_state.clone(),
+            verifier: verifier.clone(),
+            code: Zeroizing::new(String::new()),
+            denied: false,
+            installation: installation.clone(),
             started: now(),
             until: Instant::now() + Duration::from_secs(600),
             polled: Instant::now(),
@@ -169,7 +206,7 @@ async fn start(
         });
         (link, generation)
     };
-    let value=remote("device",Some(json!({"client_id":CLIENT,"installation":installation,"scope":"profile.read email.read","purpose":"sign_in","nonce":nonce})),None).await;
+    let value=remote("browser/start",Some(json!({"client_id":CLIENT,"installation":installation,"redirect_uri":format!("{installation}/auth/kagnode/callback"),"scope":"profile.read email.read","purpose":"sign_in","nonce":nonce,"state":oauth_state,"code_challenge":challenge,"code_challenge_method":"S256"})),None).await;
     let Ok(mut store) = admin.store.lock() else {
         return error(StatusCode::SERVICE_UNAVAILABLE);
     };
@@ -183,6 +220,10 @@ async fn start(
     else {
         return error(StatusCode::CONFLICT);
     };
+    if store.attempts[index].until <= Instant::now() {
+        store.attempts.remove(index);
+        return error(StatusCode::GONE);
+    }
     let value = match value {
         Ok(value) => value,
         Err(_) => {
@@ -190,38 +231,141 @@ async fn start(
             return error(StatusCode::BAD_GATEWAY);
         }
     };
-    let device = text(&value, "device_code");
-    let uri = text(&value, "verification_uri_complete");
-    let user_code = text(&value, "user_code");
+    let request = text(&value, "request_id");
+    let uri = text(&value, "authorization_uri");
     let valid = url::Url::parse(&uri).is_ok_and(|u| {
         u.origin().ascii_serialization() == ISSUER
             && u.username().is_empty()
             && u.password().is_none()
+            && u.path() == "/oauth/authorize"
+            && u.fragment().is_none()
+            && u.query_pairs().count() == 1
+            && u.query_pairs().any(|(k, v)| k == "request" && v == request)
     });
-    if !(40..=200).contains(&device.len())
-        || !valid
-        || user_code.is_empty()
-        || value["error"].is_string()
-    {
+    if !(32..=200).contains(&request.len()) || !valid || value["error"].is_string() {
         store.attempts.remove(index);
         return error(StatusCode::BAD_GATEWAY);
     }
-    let interval = value["interval"].as_u64().unwrap_or(5).clamp(5, 30);
+    let interval = 1;
     let attempt = &mut store.attempts[index];
-    attempt.device = device;
+    attempt.request = request;
     attempt.interval = interval;
     attempt.busy = false;
     let mut response = Json(
-        json!({"verification_uri":uri,"user_code":user_code,"interval":interval,"pending":true,"attempt_id":hex::encode(digest(&cookie)),"expires_in":600}),
+        json!({"authorization_uri":uri,"interval":interval,"pending":true,"attempt_id":hex::encode(digest(&cookie)),"expires_in":600}),
     )
     .into_response();
     response.headers_mut().insert(
         header::SET_COOKIE,
-        format!("entropy_attempt={cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=600")
+        format!("entropy_attempt={cookie}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600")
             .parse()
             .unwrap(),
     );
     response
+}
+/// The only accepted query strings are OAuth callbacks and local opaque resume IDs.
+pub(crate) fn browser_query_allowed(path: &str, query: &str) -> bool {
+    parse_browser_query(path, query).is_some()
+}
+fn parse_browser_query(
+    path: &str,
+    query: &str,
+) -> Option<std::collections::HashMap<String, String>> {
+    if query.len() > 2048 {
+        return None;
+    }
+    let mut values = std::collections::HashMap::new();
+    for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
+        if values.insert(k.into_owned(), v.into_owned()).is_some() {
+            return None;
+        }
+    }
+    let opaque = |v: &str, min, max| {
+        (min..=max).contains(&v.len())
+            && v.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
+    };
+    if matches!(path, "/admin" | "/admin/link") {
+        return (values.len() == 1
+            && values.get("kagnode_attempt").is_some_and(|v| {
+                v.len() == 64
+                    && v.bytes()
+                        .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+            }))
+        .then_some(values);
+    }
+    if path != "/auth/kagnode/callback"
+        || values.len() != 3
+        || values.get("iss").map(String::as_str) != Some(ISSUER)
+        || !values.get("state").is_some_and(|v| opaque(v, 43, 43))
+    {
+        return None;
+    }
+    if values.get("code").is_some_and(|v| opaque(v, 40, 200))
+        || values.get("error").is_some_and(|v| opaque(v, 1, 80))
+    {
+        Some(values)
+    } else {
+        None
+    }
+}
+async fn callback(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::RawQuery(query): axum::extract::RawQuery,
+) -> Response {
+    if configured_off() {
+        return error(StatusCode::FORBIDDEN);
+    }
+    let Some(admin) = state.management else {
+        return error(StatusCode::NOT_FOUND);
+    };
+    let Some(values) = query.and_then(|q| parse_browser_query("/auth/kagnode/callback", &q)) else {
+        return error(StatusCode::BAD_REQUEST);
+    };
+    let Some(browser) = browser(&headers) else {
+        return error(StatusCode::UNAUTHORIZED);
+    };
+    let Ok(mut store) = admin.store.lock() else {
+        return unavailable();
+    };
+    if !admin.is_healthy() {
+        return unavailable();
+    }
+    let generation = store.generation;
+    let Some(index) = store.attempts.iter().position(|a| {
+        a.browser == browser && a.generation == generation && a.until > Instant::now()
+    }) else {
+        return error(StatusCode::GONE);
+    };
+    let attempt = &mut store.attempts[index];
+    let host = headers
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("");
+    if attempt.busy
+        || attempt.installation != format!("http://{host}")
+        || !bool::from(attempt.state.as_bytes().ct_eq(values["state"].as_bytes()))
+    {
+        return error(StatusCode::BAD_REQUEST);
+    }
+    let destination = if attempt.link {
+        "/admin/link"
+    } else {
+        "/admin"
+    };
+    attempt.state.clear();
+    attempt.until = attempt.until.min(Instant::now() + Duration::from_secs(60));
+    if let Some(code) = values.get("code") {
+        attempt.code = Zeroizing::new(code.clone());
+    } else {
+        attempt.denied = true;
+    }
+    axum::response::Redirect::to(&format!(
+        "{destination}?kagnode_attempt={}",
+        hex::encode(browser)
+    ))
+    .into_response()
 }
 fn validate(
     attempt: &Attempt,
@@ -364,37 +508,24 @@ async fn poll_inner(
         else {
             return error(StatusCode::GONE);
         };
-        if a.busy || a.polled.elapsed() < Duration::from_secs(a.interval) {
+        if a.denied {
+            store.attempts.retain(|a| a.browser != browser);
+            return (StatusCode::FORBIDDEN,Json(json!({"error":{"code":"authorization_denied","message":"KagNode sign-in was not approved. Try again or sign in with your local key."}}))).into_response();
+        }
+        if a.busy || a.code.is_empty() || a.polled.elapsed() < Duration::from_secs(a.interval) {
             return Json(json!({"pending":true})).into_response();
         }
         a.busy = true;
         a.polled = Instant::now();
         a.clone()
     };
-    let mut lease = PendingLease {
+    let _lease = PendingLease {
         admin: admin.clone(),
         browser,
         generation: attempt.generation,
         keep: false,
     };
-    let result=remote("token",Some(json!({"client_id":CLIENT,"grant_type":"urn:ietf:params:oauth:grant-type:device_code","device_code":attempt.device})),None).await;
-    if let Ok(ref value) = result
-        && matches!(
-            value["error"].as_str(),
-            Some("authorization_pending" | "slow_down")
-        )
-    {
-        if let Ok(mut store) = admin.store.lock()
-            && let Some(a) = store.attempts.iter_mut().find(|a| a.browser == browser)
-        {
-            a.busy = false;
-            if value["error"] == "slow_down" {
-                a.interval = (a.interval + 5).min(30)
-            }
-        }
-        lease.keep = true;
-        return Json(json!({"pending":true})).into_response();
-    }
+    let result=remote("token",Some(json!({"client_id":CLIENT,"grant_type":"authorization_code","code":attempt.code.as_str(),"redirect_uri":format!("{}/auth/kagnode/callback",attempt.installation),"code_verifier":attempt.verifier.as_str()})),None).await;
     // Ambiguous exchanges are never retried; no refresh token is a sign-in proof.
     let owner = if let Ok(ref value) = result {
         let access = Zeroizing::new(text(value, "access_token"));
@@ -421,14 +552,7 @@ async fn poll_inner(
             false
         };
         let profile = if revoked { profile } else { Err(()) };
-        profile.and_then(|profile| {
-            validate(
-                &attempt,
-                value,
-                &profile,
-                &format!("http://127.0.0.1:{}", state.port),
-            )
-        })
+        profile.and_then(|profile| validate(&attempt, value, &profile, &attempt.installation))
     } else {
         Err(())
     };
@@ -520,8 +644,8 @@ async fn cancel(
     };
     if let Some(a) = removed {
         let _ = remote(
-            "device/cancel",
-            Some(json!({"client_id":CLIENT,"device_code":a.device})),
+            "browser/cancel",
+            Some(json!({"client_id":CLIENT,"request_id":a.request,"code_verifier":a.verifier.as_str()})),
             None,
         )
         .await;
@@ -603,6 +727,7 @@ async fn availability(State(state): State<AppState>) -> Json<Value> {
 }
 pub(super) fn routes() -> Router<AppState> {
     Router::new()
+        .route("/auth/kagnode/callback", get(callback))
         .route("/api/v1/admin/kagnode/availability", get(availability))
         .route("/api/v1/admin/kagnode/start", post(start))
         .route("/api/v1/admin/kagnode/poll", post(poll))
@@ -619,7 +744,12 @@ mod tests {
         let attempt = Attempt {
             browser: [0; 32],
             nonce: "N".repeat(43),
-            device: "D".repeat(64),
+            request: "D".repeat(64),
+            state: "S".repeat(43),
+            verifier: Zeroizing::new("V".repeat(43)),
+            code: Zeroizing::new("C".repeat(43)),
+            denied: false,
+            installation: "http://127.0.0.1:8098".into(),
             started: time - 5.0,
             until: Instant::now() + Duration::from_secs(600),
             polled: Instant::now(),
@@ -631,6 +761,33 @@ mod tests {
         let value = json!({"scope":"profile.read email.read","authorization":{"issuer":ISSUER,"client_id":CLIENT,"installation":"http://127.0.0.1:8098","purpose":"sign_in","nonce":attempt.nonce,"subject":"immutable-owner","auth_time":time-10.0,"approved_at":time-1.0,"issued_at":time-1.0,"expires_at":time+119.0}});
         let profile = json!({"issuer":ISSUER,"subject":"immutable-owner","name":"Fictional Owner","email":"owner@example.invalid","email_verified":true,"photo":""});
         (attempt, value, profile)
+    }
+    #[test]
+    fn callback_query_is_narrow_issuer_bound_and_has_no_duplicate_or_bearer_fields() {
+        let valid = format!(
+            "state={}&iss=https%3A%2F%2Fnebulacoder.com&code={}",
+            "S".repeat(43),
+            "C".repeat(43)
+        );
+        assert!(browser_query_allowed("/auth/kagnode/callback", &valid));
+        for bad in [
+            format!("{valid}&state={}", "S".repeat(43)),
+            format!("{valid}&error=access_denied"),
+            valid.replace("nebulacoder.com", "attacker.invalid"),
+            valid.replace("&iss=https%3A%2F%2Fnebulacoder.com", ""),
+            format!("{valid}&access_token=secret"),
+        ] {
+            assert!(!browser_query_allowed("/auth/kagnode/callback", &bad));
+        }
+        assert!(!browser_query_allowed("/admin", &valid));
+        assert!(browser_query_allowed(
+            "/admin",
+            &format!("kagnode_attempt={}", "a".repeat(64))
+        ));
+        assert!(!browser_query_allowed(
+            "/api/v1/admin/status",
+            &format!("kagnode_attempt={}", "a".repeat(64))
+        ));
     }
     #[test]
     fn fresh_owner_proof_validates_every_binding_and_expiry() {
@@ -752,9 +909,14 @@ mod flow_tests {
         headers.insert("x-csrf-token", csrf.parse().unwrap());
         headers
     }
-    async fn begin(state: &AppState, headers: HeaderMap, credential: &str) -> (HeaderMap, String) {
+    async fn begin_pending(
+        state: &AppState,
+        mut headers: HeaderMap,
+        credential: &str,
+    ) -> (HeaderMap, String) {
+        headers.insert(header::HOST, "127.0.0.1:8098".parse().unwrap());
         responses(vec![
-            json!({"device_code":"D".repeat(64),"verification_uri_complete":format!("{ISSUER}/account/connect?code=fictional"),"user_code":"TEST-CODE","interval":5}),
+            json!({"request_id":"D".repeat(64),"authorization_uri":format!("{ISSUER}/oauth/authorize?request={}","D".repeat(64)),"expires_in":600}),
         ]);
         let response = start(
             State(state.clone()),
@@ -779,6 +941,35 @@ mod flow_tests {
             let mut store = state.management.as_ref().unwrap().store.lock().unwrap();
             store.attempts.last_mut().unwrap().polled = Instant::now() - Duration::from_secs(6);
         }
+        headers.insert(header::HOST, "127.0.0.1:8098".parse().unwrap());
+        (headers, id)
+    }
+    async fn begin(state: &AppState, headers: HeaderMap, credential: &str) -> (HeaderMap, String) {
+        let (headers, id) = begin_pending(state, headers, credential).await;
+        let oauth_state = state
+            .management
+            .as_ref()
+            .unwrap()
+            .store
+            .lock()
+            .unwrap()
+            .attempts
+            .last()
+            .unwrap()
+            .state
+            .clone();
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("state", &oauth_state)
+            .append_pair("iss", ISSUER)
+            .append_pair("code", &"C".repeat(43))
+            .finish();
+        let response = callback(
+            State(state.clone()),
+            headers.clone(),
+            axum::extract::RawQuery(Some(query)),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
         (headers, id)
     }
     fn approved(state: &AppState, subject: &str) {
@@ -799,6 +990,124 @@ mod flow_tests {
             json!({"issuer":ISSUER,"subject":subject,"name":"Fictional Owner","photo":"","email":"owner@example.invalid","email_verified":true}),
             json!({}),
         ]);
+    }
+    #[tokio::test]
+    async fn callback_requires_pending_cookie_state_issuer_and_one_use_then_denial_is_terminal() {
+        let (_temp, state, key) = state();
+        let local = local_session(&state, &key).await;
+        let (headers, id) = begin_pending(&state, local, &key).await;
+        assert!(
+            state
+                .management
+                .as_ref()
+                .unwrap()
+                .store
+                .lock()
+                .unwrap()
+                .attempts[0]
+                .code
+                .is_empty()
+        );
+        assert_eq!(
+            value(
+                poll(
+                    State(state.clone()),
+                    headers.clone(),
+                    Json(AttemptRef {
+                        attempt_id: id.clone()
+                    })
+                )
+                .await
+            )
+            .await["pending"],
+            true
+        );
+        let oauth_state = state
+            .management
+            .as_ref()
+            .unwrap()
+            .store
+            .lock()
+            .unwrap()
+            .attempts[0]
+            .state
+            .clone();
+        let query =
+            format!("state={oauth_state}&iss=https%3A%2F%2Fnebulacoder.com&error=access_denied");
+        let wrong = query.replace(&oauth_state, &"X".repeat(43));
+        assert_eq!(
+            callback(
+                State(state.clone()),
+                headers.clone(),
+                axum::extract::RawQuery(Some(wrong))
+            )
+            .await
+            .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            callback(
+                State(state.clone()),
+                HeaderMap::new(),
+                axum::extract::RawQuery(Some(query.clone()))
+            )
+            .await
+            .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        let r = callback(
+            State(state.clone()),
+            headers.clone(),
+            axum::extract::RawQuery(Some(query.clone())),
+        )
+        .await;
+        assert_eq!(r.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            r.headers()[header::LOCATION],
+            format!("/admin/link?kagnode_attempt={id}")
+        );
+        assert_eq!(
+            callback(
+                State(state.clone()),
+                headers.clone(),
+                axum::extract::RawQuery(Some(query))
+            )
+            .await
+            .status(),
+            StatusCode::BAD_REQUEST
+        );
+        let r = poll(
+            State(state.clone()),
+            headers.clone(),
+            Json(AttemptRef {
+                attempt_id: id.clone(),
+            }),
+        )
+        .await;
+        assert_eq!(r.status(), StatusCode::FORBIDDEN);
+        assert_eq!(value(r).await["error"]["code"], "authorization_denied");
+        assert_eq!(
+            poll(
+                State(state.clone()),
+                headers,
+                Json(AttemptRef { attempt_id: id })
+            )
+            .await
+            .status(),
+            StatusCode::GONE
+        );
+        assert!(
+            state
+                .management
+                .as_ref()
+                .unwrap()
+                .store
+                .lock()
+                .unwrap()
+                .config
+                .owner
+                .is_none()
+        );
     }
     #[tokio::test]
     async fn owner_link_sign_in_replay_wrong_owner_and_cancellation() {
@@ -1006,5 +1315,73 @@ mod flow_tests {
                 .status(),
             StatusCode::GONE
         );
+    }
+}
+
+/// Explicit local QA server, compiled only into the unit-test executable.
+#[cfg(test)]
+mod browser_fixture {
+    use super::*;
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "explicit fictional issuer/browser fixture; no production transport override exists"]
+    async fn serve() {
+        let base = std::env::var("ENTROPY_TEST_ISSUER").expect("fictional issuer origin required");
+        let parsed = url::Url::parse(&base).unwrap();
+        assert_eq!(parsed.scheme(), "http");
+        assert_eq!(parsed.host_str(), Some("127.0.0.1"));
+        assert_eq!(parsed.origin().ascii_serialization(), base);
+        assert_eq!(parsed.path(), "/");
+        assert!(
+            parsed.query().is_none()
+                && parsed.fragment().is_none()
+                && parsed.username().is_empty()
+                && parsed.password().is_none()
+        );
+        TEST_TRANSPORT.with(|v| *v.borrow_mut() = Some(base));
+        let temp = tempfile::tempdir().unwrap();
+        let directory = temp.path().join("service");
+        initialize(&directory).unwrap();
+        let credential = fs::read_to_string(directory.join("admin.key")).unwrap();
+        let registry = Arc::new(Registry::managed());
+        let admin =
+            Management::load(&directory.join("credentials.json"), registry.clone()).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let state = AppState {
+            engine: Arc::new(
+                crate::engine::Engine::new(
+                    crate::engine::Mode::OsBacked,
+                    4,
+                    Arc::new(crate::crypto::OsRandom),
+                    None,
+                )
+                .unwrap(),
+            ),
+            registry,
+            management: Some(admin),
+            port,
+            linux_counters: false,
+            source_status: Arc::new(Mutex::new(crate::sources::SourceStatus::synthetic())),
+        };
+        let metadata = PathBuf::from(std::env::var("ENTROPY_TEST_STATE").unwrap());
+        let stop = metadata.with_extension("stop");
+        assert!(!metadata.exists() && !stop.exists());
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&metadata)
+            .unwrap();
+        file.write_all(json!({"origin":format!("http://127.0.0.1:{port}"),"credential":credential,"directory":directory}).to_string().as_bytes()).unwrap();
+        drop(file);
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        let running = tokio::spawn(crate::server::serve(listener, state, rx));
+        while !stop.exists() {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        tx.send(true).unwrap();
+        running.await.unwrap().unwrap();
+        fs::remove_file(metadata).unwrap();
+        fs::remove_file(stop).unwrap();
     }
 }

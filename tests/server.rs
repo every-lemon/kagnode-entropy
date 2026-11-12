@@ -310,3 +310,65 @@ fn out_of_order_requests_cannot_rewind_the_rate_bucket_clock() {
     assert!(!registry.allow_at("alice", 1, newer));
     assert!(registry.allow_at("alice", 1, newer + Duration::from_secs(1)));
 }
+
+#[tokio::test]
+async fn only_bound_browser_callback_and_resume_queries_cross_the_query_boundary() {
+    let app = server::app(state());
+    let query = format!(
+        "state={}&iss=https%3A%2F%2Fnebulacoder.com&code={}",
+        "S".repeat(43),
+        "C".repeat(43)
+    );
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/auth/kagnode/callback?{query}"),
+            None,
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND); // No management configured, not a query-boundary rejection.
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    assert_eq!(response.headers()["referrer-policy"], "no-referrer");
+    for (method, path) in [
+        ("POST", format!("/auth/kagnode/callback?{query}")),
+        (
+            "GET",
+            format!("/auth/kagnode/callback?{query}&token=secret"),
+        ),
+        (
+            "GET",
+            format!(
+                "/auth/kagnode/callback?{}",
+                query.replace("nebulacoder.com", "attacker.invalid")
+            ),
+        ),
+        (
+            "GET",
+            format!("/api/v1/status?kagnode_attempt={}", "a".repeat(64)),
+        ),
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(request(method, &path, None, None))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    assert_eq!(
+        app.oneshot(request(
+            "GET",
+            &format!("/admin?kagnode_attempt={}", "a".repeat(64)),
+            None,
+            None
+        ))
+        .await
+        .unwrap()
+        .status(),
+        StatusCode::OK
+    );
+}

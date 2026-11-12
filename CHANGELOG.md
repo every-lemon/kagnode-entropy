@@ -1,3 +1,12 @@
+# 5.0.1
+
+- Replace browser device-code entry with same-tab authorization and an exact local callback.
+- Bind pending attempts to the browser cookie, PKCE verifier, issuer, state and owner generation; consume callback state and authorization codes once.
+- Preserve a newly confirmed session when an older anonymous status response arrives late.
+- Show a declined authorization as a declined connection rather than a transport failure.
+- Keep the local administrator key, explicit owner linking, local-only sign-in and opt-out policy independent.
+- Permit only narrow callback/resume queries; retain denial of query credentials on API endpoints.
+
 # 5.0.0
 
 - Production output is unchanged OS CSPRNG bytes; public-input mixing remains experimental.

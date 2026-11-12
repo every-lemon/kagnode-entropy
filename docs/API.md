@@ -28,7 +28,7 @@ Per-client allocation budget is 16 chunks/second with a burst of 32. Failed empt
 | --- | --- |
 | 400 | Invalid fields, body, count, context or transfer encoding |
 | 401 | Missing or invalid bearer token |
-| 403 | Invalid Host/Origin or query-string request |
+| 403 | Invalid Host/Origin or unsupported query-string request (only validated browser callback/resume queries are allowed) |
 | 404 / 405 | Unknown path / unsupported method |
 | 413 / 415 | Body too large / incorrect content type |
 | 429 | Per-client allocation budget exhausted; Retry-After: 1 |

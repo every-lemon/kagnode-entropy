@@ -197,7 +197,11 @@ async fn boundary(State(state): State<AppState>, request: Request, next: Next) -
         .headers()
         .get(header::ORIGIN)
         .is_none_or(|v| v.to_str().ok() == Some(format!("http://{host}").as_str()));
-    let mut response = if !valid_host || !valid_origin || request.uri().query().is_some() {
+    let query_allowed = request.uri().query().is_none_or(|q| {
+        request.method() == axum::http::Method::GET
+            && crate::management::browser_query_allowed(request.uri().path(), q)
+    });
+    let mut response = if !valid_host || !valid_origin || !query_allowed {
         failure(
             StatusCode::FORBIDDEN,
             "origin_rejected",

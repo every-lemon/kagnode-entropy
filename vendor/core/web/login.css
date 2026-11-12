@@ -266,3 +266,50 @@ html[data-kn-core] .kn-core-login-content .kn-core-login-check {
   align-items: flex-start;
   font-weight: 400;
 }
+
+html[data-kn-core] .kn-core-login-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 0 4px;
+}
+html[data-kn-core] [data-core-login-credentials] {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+html[data-kn-core] .kn-core-login-identity > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--kn-muted);
+}
+html[data-kn-core] .kn-core-login-content button.kn-core-login-change {
+  flex: none;
+  width: auto;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--kn-link);
+}
+html[data-kn-core] [data-core-login] [hidden] {
+  display: none !important;
+}
+@keyframes kn-core-login-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+html[data-kn-core] .kn-core-login-card {
+  animation: kn-core-login-enter 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-kn-core] .kn-core-login-card {
+    animation: none;
+  }
+}

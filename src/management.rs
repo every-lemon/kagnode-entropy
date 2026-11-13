@@ -471,9 +471,46 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     )
         .into_response()
 }
+// This embedded build has no automatic Core manager/event channel. Do not
+// manufacture an update notice or expose privileged local configuration.
+async fn core_notice(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(admin) = state.management else {
+        return error(StatusCode::NOT_FOUND);
+    };
+    if !admin.is_healthy() {
+        return unavailable();
+    }
+    let Ok(mut store) = admin.store.lock() else {
+        return unavailable();
+    };
+    if !Management::authorized(&mut store, &headers, false) {
+        return error(StatusCode::UNAUTHORIZED);
+    }
+    Json(json!({"available":false,"notice":null})).into_response()
+}
+async fn core_notice_dismiss(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(admin) = state.management else {
+        return error(StatusCode::NOT_FOUND);
+    };
+    if !admin.is_healthy() {
+        return unavailable();
+    }
+    let Ok(mut store) = admin.store.lock() else {
+        return unavailable();
+    };
+    if !Management::authorized(&mut store, &headers, true) {
+        return error(StatusCode::UNAUTHORIZED);
+    }
+    error(StatusCode::NOT_FOUND)
+}
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(account::routes())
+        .route("/api/v1/kagnode-core/whats-new", get(core_notice))
+        .route(
+            "/api/v1/kagnode-core/whats-new/dismiss",
+            post(core_notice_dismiss),
+        )
         .route("/api/v1/admin/login", post(login))
         .route("/api/v1/admin/status", get(status))
         .route("/api/v1/admin/clients", post(clients))

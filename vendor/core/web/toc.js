@@ -84,7 +84,12 @@
           const focus =
             list.contains(document.activeElement) &&
             document.activeElement.matches(":focus-visible");
-          if (!focus || document.activeElement === link) center(list, link);
+          if (
+            !focus &&
+            !state.pointerActive &&
+            performance.now() > state.interactingUntil
+          )
+            center(list, link);
         }
       } else list.removeAttribute("tabindex");
       state.current = link;
@@ -107,7 +112,27 @@
       const resize = new ResizeObserver(refresh);
       resize.observe(list);
       resize.observe(document.body);
-      instances.set(toc, { list, indicator, resize });
+      const state = {
+        list,
+        indicator,
+        resize,
+        pointerActive: false,
+        interactingUntil: 0,
+      };
+      instances.set(toc, state);
+      const browsing = () => {
+        state.interactingUntil = performance.now() + 800;
+      };
+      list.addEventListener("wheel", browsing, { passive: true });
+      list.addEventListener("touchstart", browsing, { passive: true });
+      list.addEventListener("touchmove", browsing, { passive: true });
+      list.addEventListener("touchend", browsing, { passive: true });
+      list.addEventListener("keydown", browsing);
+      list.addEventListener("pointerdown", () => {
+        state.pointerActive = true;
+        browsing();
+      });
+
       list.addEventListener("focusin", (e) => {
         const link = e.target.closest("a");
         if (link?.matches(":focus-visible")) center(list, link);
@@ -139,6 +164,17 @@
     }
     refresh();
   }
+  const endPointer = () => {
+    for (const state of instances.values()) {
+      if (state.pointerActive) {
+        state.pointerActive = false;
+        state.interactingUntil = performance.now() + 800;
+      }
+    }
+  };
+  addEventListener("pointerup", endPointer);
+  addEventListener("pointercancel", endPointer);
+  addEventListener("blur", endPointer);
   addEventListener("scroll", refresh, { passive: true, capture: true });
   addEventListener("resize", refresh);
   addEventListener("hashchange", refresh);

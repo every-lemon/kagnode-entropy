@@ -1,0 +1,8 @@
+{
+  "title": "A more consistent KagNode interface",
+  "items": [
+    "Switch views with clearer sliding controls and keyboard navigation.",
+    "Loading messages now follow the action and stay accurate when tasks overlap.",
+    "Navigation, account photos and mobile dialogs share the same controls."
+  ]
+}

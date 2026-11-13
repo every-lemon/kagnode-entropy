@@ -40,7 +40,9 @@
   function eligible(el, axis) {
     if (
       !(el instanceof HTMLElement) ||
-      el.closest("[data-native-scroll],.kn-core-rail")
+      el.closest(
+        "[data-native-scroll],.kn-core-rail,#sidebar,[data-core-sidebar],.kn-core-segments",
+      )
     )
       return false;
     if (el.closest("[hidden],[inert]")) return false;
@@ -177,6 +179,9 @@
     regions.delete(el);
   }
   function scan(container = document) {
+    document.documentElement.dataset.coreScrollMode = active()
+      ? "custom"
+      : "native";
     for (const [el, state] of regions)
       if (!el.isConnected || !active()) remove(el, state);
     if (active()) {

@@ -41,7 +41,7 @@ html[data-kn-core]
     .k-select,
     .k-picker,
     .quick-search
-  ) {
+  ):not([data-core-account-trigger]) {
   border-radius: var(--kn-radius-control) !important;
 }
 html[data-kn-core]
@@ -530,21 +530,6 @@ html[data-kn-core][data-core-collapsed="true"]
 .kag-loading-covered .kn-core-rail {
   display: none !important;
 }
-.kn-core-loading {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483600;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  background: var(--kn-bg);
-  color: var(--kn-text);
-}
-.kn-core-loading[hidden] {
-  display: none;
-}
 html[data-kn-core]
   :is(
     .loading,
@@ -907,4 +892,14 @@ html[data-kn-core] :is([data-core-nav-root], [data-core-nav-folder])[hidden] {
 
 [data-core-nav-back] > svg {
   transform: rotate(180deg);
+}
+/* Avatar-only triggers are circles; account rows and menu surfaces keep their own geometry. */
+html[data-kn-core]
+  :is(
+    [data-core-account-trigger].avatar,
+    [data-core-account-trigger][data-core-avatar],
+    [data-core-account-trigger][data-kn-account-avatar]
+  ) {
+  border-radius: 50% !important;
+  object-fit: cover;
 }

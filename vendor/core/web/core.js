@@ -234,6 +234,13 @@
     window.KagNodeScroll?.refresh(sidebar);
   }
   function drawer(open, restore = true) {
+    if (!sidebar?.isConnected || !scrim?.isConnected) {
+      root.dataset.coreDrawer = "false";
+      all("[data-mobile],#mobile-menu,[data-core-mobile]").forEach((button) =>
+        button.setAttribute("aria-expanded", "false"),
+      );
+      return;
+    }
     root.dataset.coreDrawer = String(open);
     scrim.hidden = !open;
     sidebar.inert = mobile() && !open;
@@ -508,6 +515,7 @@
     }
 
     window.KagNodeLoading?.enhance();
+    window.KagNodeSegments?.refresh();
     if (!sidebar || !sidebar.isConnected) {
       scrim?.remove();
       document.querySelector(".kn-core-mobile-toggle")?.remove();
@@ -554,7 +562,9 @@
     }
     if (
       window.KagNodeTheme?.session.authenticated &&
-      !$("[data-core-account-trigger]")
+      !$(
+        "[data-core-account-trigger],[data-account-menu],button[data-kn-account-avatar]",
+      )
     ) {
       const header = $(".topbar-right,.account-controls,.topbar");
       if (header) {
@@ -563,12 +573,24 @@
         button.type = "button";
         button.dataset.coreAccountTrigger = "";
         if (avatar) {
+          const visual = avatar.matches("button,a")
+            ? avatar.querySelector("img,.avatar") || null
+            : avatar;
+          const clone = visual
+            ? visual.cloneNode(true)
+            : element("span", "avatar", avatar.textContent.trim().slice(0, 2));
+          clone.removeAttribute("id");
+          clone.dataset.coreAvatar = "";
+          clone
+            .querySelectorAll("[id]")
+            .forEach((n) => n.removeAttribute("id"));
           const parent = avatar.parentElement;
-          if (parent?.closest(".topbar") && parent !== header) {
+          if (parent?.closest(".topbar") && parent !== header)
             parent.hidden = true;
-            parent.before(button);
-          } else header.append(button);
-          button.append(avatar);
+          else avatar.hidden = true;
+          avatar.dataset.coreAvatarSource = "";
+          button.append(clone);
+          header.append(button);
         } else {
           button.innerHTML = userIcon;
           header.append(button);
@@ -817,32 +839,71 @@
     attributes: true,
     attributeFilter: ["hidden", "open", "inert", "data-core-icon"],
   });
-  const loading = {
-    show(label = "Loading…") {
-      let el = $("#kn-core-loading");
-      if (!el) {
-        el = element("div", "kn-core-loading");
-        el.id = "kn-core-loading";
-        el.role = "status";
-        el.setAttribute("aria-live", "polite");
-        el.append(
-          window.KagNodeLoading.spinner(),
-          element("span", "kn-core-loading-label"),
-        );
-        document.body.append(el);
+  document.addEventListener("kagnode:avatar-changed", (event) => {
+    const value = event.detail,
+      session = window.KagNodeTheme?.session;
+    if (
+      !session?.authenticated ||
+      value?.subject !== session.subject ||
+      typeof value.url !== "string"
+    )
+      return;
+    let url = "";
+    if (value.url) {
+      try {
+        const parsed = new URL(value.url, location.origin);
+        if (
+          parsed.origin !== location.origin ||
+          !["http:", "https:"].includes(parsed.protocol)
+        )
+          return;
+        url = parsed.href;
+      } catch {
+        return;
       }
-      $(".kn-core-loading-label", el).textContent = label;
-      el.hidden = false;
-      root.classList.add("kag-loading-covered");
-      document.dispatchEvent(new Event("kagnode:loading-start"));
-    },
-    hide() {
-      const el = $("#kn-core-loading");
-      if (el) el.hidden = true;
-      root.classList.remove("kag-loading-covered");
-      document.dispatchEvent(new Event("kagnode:loading-end"));
-    },
-  };
+    }
+    for (const host of all(
+      "[data-core-avatar],[data-core-account-trigger] .avatar,[data-core-account-trigger] > img",
+    )) {
+      const image = host.matches("img") ? host : host.querySelector("img");
+      if (image) {
+        if (url) {
+          image.src = url;
+          image.hidden = host.hasAttribute("data-core-avatar-source");
+        } else {
+          image.removeAttribute("src");
+          image.hidden = true;
+        }
+      }
+      const holder = host.matches("img") ? host.parentElement : host;
+      if (
+        holder?.matches(
+          "[data-core-account-trigger],.avatar,[data-core-avatar]",
+        )
+      ) {
+        let fallback = holder.querySelector(".kn-core-avatar-fallback");
+        if (!url && !fallback) {
+          fallback = element(
+            "span",
+            "kn-core-avatar-fallback",
+            (config.name || config.email || "?")
+              .trim()
+              .slice(0, 2)
+              .toUpperCase(),
+          );
+          holder.append(fallback);
+        }
+        if (fallback) fallback.hidden = !!url;
+      }
+      if (!image && url) {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.src = url;
+        host.replaceChildren(img);
+      }
+    }
+  });
+  const loading = window.KagNodeLoading;
   window.KagNodeCore = {
     version: config.version || "1.0.0",
     config,

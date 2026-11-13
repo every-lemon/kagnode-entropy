@@ -336,3 +336,54 @@ async fn consumer_credentials_are_retained_by_restart() {
         Some("persisted-client".into())
     );
 }
+
+#[tokio::test]
+async fn embedded_core_notice_is_authenticated_and_truthfully_unavailable() {
+    let (_temp, state, key) = fixture();
+    let app = server::app(state);
+    let path = "/api/v1/kagnode-core/whats-new";
+    assert_eq!(
+        app.clone()
+            .oneshot(request(path, None, None, None))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let (cookie, csrf) = login(app.clone(), &key).await;
+    let response = app
+        .clone()
+        .oneshot(request(path, None, Some(&cookie), None))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let value: Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(value, json!({"available":false,"notice":null}));
+    let dismiss = "/api/v1/kagnode-core/whats-new/dismiss";
+    assert_eq!(
+        app.clone()
+            .oneshot(request(
+                dismiss,
+                Some(json!({"id":"fake"})),
+                Some(&cookie),
+                None
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        app.oneshot(request(
+            dismiss,
+            Some(json!({"id":"fake"})),
+            Some(&cookie),
+            Some(&csrf)
+        ))
+        .await
+        .unwrap()
+        .status(),
+        StatusCode::NOT_FOUND
+    );
+}

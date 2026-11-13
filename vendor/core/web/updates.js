@@ -116,6 +116,7 @@
           if (!proceed) return;
         }
         b.disabled = true;
+        const epoch = generation;
         try {
           core.loading.show(
             action === "check"
@@ -126,7 +127,9 @@
                   ? "Restoring UI components…"
                   : "Updating preference…",
           );
-          current = await request(action, data);
+          const value = await request(action, data);
+          if (epoch !== generation) return;
+          current = value;
           render();
         } catch (e) {
           status.textContent = e.message;
@@ -146,6 +149,14 @@
         "Install the verified Core UI patch " +
           candidate.version +
           "? Your application service will keep running.",
+      );
+    if (current.capabilities?.update_summaries)
+      button(
+        current.summaries !== false
+          ? "Disable user update summaries"
+          : "Enable user update summaries",
+        "policy",
+        { summaries: current.summaries === false },
       );
     button(
       current.automatic

@@ -1,3 +1,8 @@
+# 5.0.2
+
+- Updated the reviewed Core interface and account-scoped update notice integration where supported.
+- Added project-owned setup plan, review, apply, health and recovery interfaces; existing native installers retain their own boundaries.
+
 # 5.0.1
 
 - Replace browser device-code entry with same-tab authorization and an exact local callback.

@@ -1,8 +1,8 @@
 {
-  "title": "More reliable account controls",
+  "title": "More reliable Core management",
   "items": [
-    "Ordinary actions leave your scrolling preference unchanged.",
-    "Background update notices pause safely during navigation and loading.",
-    "Update notices keep their dismissal state during background work."
+    "Background component status checks stop safely during reload and navigation.",
+    "Interrupted update actions are never replayed automatically.",
+    "Status refreshes resume without opening unexpected sign-in prompts."
   ]
 }

@@ -412,7 +412,9 @@ class Installer:
             item = next(x for x in dependencies if x["name"] == executable)
             item["version"] = "unavailable"
             item["compatible"] = False
-            if item["present"]:
+            # Do not execute a PATH-resolved program as root before checking
+            # that it is a system-wide, root-controlled prerequisite.
+            if item["present"] and self.system_tool(shutil.which(executable)):
                 try:
                     probe = self.run(
                         [shutil.which(executable), flag],
@@ -799,9 +801,10 @@ class Installer:
         ) as error:
             journal["stage"] = "needs_recovery"
             self.save_journal(request, journal)
-            return self.result(
-                request, "needs_recovery", True, {"ok": False, "checks": []}, str(error)
-            )
+            health = {"ok": False, "checks": []}
+            result = self.result(request, "needs_recovery", True, health, str(error))
+            result["binding"] = self.binding(request, plan, health)
+            return result
 
     def native(self, request, plan, journal):
         c = plan["configuration"]

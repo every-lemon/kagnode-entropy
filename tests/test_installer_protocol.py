@@ -128,6 +128,15 @@ class InstallerTests(unittest.TestCase):
             )
         )
 
+    def test_private_runtime_is_rejected_without_executing_its_version_probe(self):
+        if self.spec["kind"] != "application":
+            return
+        self.installer.system_tool = lambda _: False
+        plan = self.installer.plan(self.configured())
+        self.assertFalse(plan["supported"])
+        self.assertIn("system-wide", plan["reason"])
+        self.assertEqual(self.calls, [])
+
     def test_adopt_does_not_need_setup_password_or_admin_fields(self):
         request = copy.deepcopy(self.request)
         request["mode"] = "adopt"
@@ -368,6 +377,9 @@ class InstallerTests(unittest.TestCase):
             result = self.installer.apply(request)
         self.assertEqual(result["state"], "needs_recovery")
         build = [argv for argv, _ in self.calls if "pip" in argv or "venv" in argv]
+        self.assertEqual(result["binding"]["managed_by"], "project-installer")
+        self.assertFalse(result["binding"]["updates"]["supported"])
+        self.assertIsNone(result["binding"]["observed_runtime_version"])
         self.assertEqual(len(build), 2)
         self.assertTrue(
             all(

@@ -1,8 +1,8 @@
 {
-  "title": "A more consistent KagNode interface",
+  "title": "More reliable account controls",
   "items": [
-    "Switch views with clearer sliding controls and keyboard navigation.",
-    "Loading messages now follow the action and stay accurate when tasks overlap.",
-    "Navigation, account photos and mobile dialogs share the same controls."
+    "Ordinary actions leave your scrolling preference unchanged.",
+    "Background update notices pause safely during navigation and loading.",
+    "Update notices keep their dismissal state during background work."
   ]
 }

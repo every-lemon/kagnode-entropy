@@ -4,16 +4,80 @@
   const dirty = new Set(),
     seen = new Set();
   let generation = 0,
+    readGeneration = 0,
     pending = null,
     panel = null,
     controller = null,
     reading = false,
-    checked = 0;
+    checked = 0,
+    navigating = false;
   const session = () => window.KagNodeTheme?.session;
   const ready = () =>
     !!session()?.authenticated &&
     (window.KagNodeWhatsNewHost?.ready?.() === true ||
       document.body.dataset.coreNotices === "enabled");
+  const blocked = () =>
+    navigating ||
+    document.hidden ||
+    window.KagNodeLoading?.pending > 0 ||
+    document.documentElement.matches(".kag-loading-covered,.page-loading");
+  function abortRead() {
+    readGeneration++;
+    controller?.abort();
+    controller = null;
+    reading = false;
+    checked = 0;
+  }
+  function navigationIntent(event) {
+    if (event.type === "click") {
+      if (
+        event.button ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const link = event.target.closest?.("a[href]");
+      if (
+        !link ||
+        link.hasAttribute("download") ||
+        (link.target && link.target !== "_self")
+      )
+        return;
+      let url;
+      try {
+        url = new URL(link.href, location.href);
+      } catch {
+        return;
+      }
+      if (
+        !/^https?:$/.test(url.protocol) ||
+        (url.origin === location.origin &&
+          url.pathname === location.pathname &&
+          url.search === location.search &&
+          url.hash)
+      )
+        return;
+    } else {
+      const form = event.target;
+      if (
+        !(form instanceof HTMLFormElement) ||
+        form.method === "dialog" ||
+        ((event.submitter?.formTarget || form.target) &&
+          (event.submitter?.formTarget || form.target) !== "_self")
+      )
+        return;
+    }
+    navigating = true;
+    abortRead();
+    setTimeout(() => {
+      if (event.defaultPrevented) {
+        navigating = false;
+        refresh();
+      }
+    });
+  }
   const editing = () => {
     for (const form of dirty) if (!form.isConnected) dirty.delete(form);
     return (
@@ -73,6 +137,7 @@
       !pending ||
       panel ||
       !ready() ||
+      blocked() ||
       editing() ||
       seen.has(session().subject + ":" + pending.id)
     )
@@ -133,11 +198,12 @@
     window.KagNodeDialogs.open(d, { sheet: true });
   }
   async function refresh() {
-    if (!ready() || reading || Date.now() - checked < 30000) {
+    if (!ready() || blocked() || reading || Date.now() - checked < 30000) {
       show();
       return;
     }
-    const epoch = generation;
+    const epoch = generation,
+      attempt = readGeneration;
     reading = true;
     controller = new AbortController();
     try {
@@ -148,12 +214,18 @@
       });
       if (!r.ok) return;
       const value = await r.json();
-      if (epoch !== generation || !ready()) return;
+      if (
+        epoch !== generation ||
+        attempt !== readGeneration ||
+        !ready() ||
+        blocked()
+      )
+        return;
       pending = notice(value);
       show();
     } catch {
     } finally {
-      if (epoch === generation) {
+      if (epoch === generation && attempt === readGeneration) {
         reading = false;
         checked = Date.now();
       }
@@ -182,6 +254,30 @@
     refresh();
   });
   document.addEventListener("kagnode:account-ready", refresh);
+  document.addEventListener("click", navigationIntent, true);
+  document.addEventListener("submit", navigationIntent, true);
+  addEventListener("beforeunload", () => {
+    navigating = true;
+    abortRead();
+  });
+  addEventListener("pagehide", () => {
+    navigating = true;
+    abortRead();
+  });
+  addEventListener("pageshow", () => {
+    navigating = false;
+    refresh();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) abortRead();
+    else refresh();
+  });
+  document.addEventListener("kagnode:loading-start", abortRead);
+  document.addEventListener("kagnode:loading-end", refresh);
+  document.addEventListener("kagnode:loading-operation", (event) => {
+    if (event.detail?.pending) abortRead();
+    else refresh();
+  });
   for (const type of [
     "focusout",
     "kagnode:dialog-close",

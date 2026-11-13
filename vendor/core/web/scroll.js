@@ -179,7 +179,7 @@
     regions.delete(el);
   }
   function scan(container = document) {
-    document.documentElement.dataset.coreScrollMode = active()
+    document.documentElement.dataset.coreScrollState = active()
       ? "custom"
       : "native";
     for (const [el, state] of regions)

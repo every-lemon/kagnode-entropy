@@ -43,7 +43,8 @@
     overlay,
     topbar,
     legacy,
-    covered = false;
+    covered = false,
+    previousPending = -1;
   const node = (tag, cls) => {
     const n = document.createElement(tag);
     n.className = cls;
@@ -86,6 +87,14 @@
       covered = !!active;
       document.dispatchEvent(
         new Event(covered ? "kagnode:loading-start" : "kagnode:loading-end"),
+      );
+    }
+    if (previousPending !== operations.size) {
+      previousPending = operations.size;
+      document.dispatchEvent(
+        new CustomEvent("kagnode:loading-operation", {
+          detail: { pending: operations.size },
+        }),
       );
     }
     const targets = new Set(

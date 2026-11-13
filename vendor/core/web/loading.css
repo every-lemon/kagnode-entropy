@@ -166,11 +166,11 @@ html[data-kn-core] .kn-core-loading-topbar > .kn-core-loading-runner {
     opacity: 0.7;
   }
 }
-html[data-core-scroll-mode="custom"]
+html[data-core-scroll-state="custom"]
   :is(#sidebar, [data-core-sidebar], .kn-core-sidebar-scroll) {
   scrollbar-width: none;
 }
-html[data-core-scroll-mode="custom"]
+html[data-core-scroll-state="custom"]
   :is(
     #sidebar,
     [data-core-sidebar],

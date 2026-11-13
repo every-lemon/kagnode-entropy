@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="KagNode. ">
+<!-- PHASE 00: transparent canvas; geometry and typography are vectors -->
+<!-- PHASE 01: canonical geometric symbol -->
+<g transform="translate(0 0) scale(2)" fill="#2563eb"><path d="M4 18C4 9 11 4 23 5L18 27C10 28 4 25 4 18Z"/><path d="m25 11 4 5-3 10-4-3Z"/></g>
+</svg>

@@ -11,7 +11,8 @@ html[data-kn-core] .kn-core-spinner {
   color: #2563eb;
   isolation: isolate;
 }
-html[data-kn-core] .kn-core-spinner > .kn-core-spinner-orbit {
+html[data-kn-core] .kn-core-spinner > .kn-core-spinner-layer,
+html[data-kn-core] .kn-core-spinner-layer > .kn-core-spinner-orbit {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -35,9 +36,14 @@ html[data-kn-core] .kn-core-spinner > .kn-core-spinner-orbit {
   fill: currentColor;
   stroke: none;
 }
-.kn-core-spinner-rotor {
-  transform-origin: 48px 48px;
+.kn-core-spinner-layer {
+  display: block;
+  transform-origin: center;
+  will-change: transform;
   animation: kn-core-orbit 1.8s linear infinite;
+}
+.kn-core-spinner-rotor {
+  animation: none;
 }
 html[data-kn-core] .kn-core-spinner > .kn-core-spinner-mark {
   display: block;
@@ -75,9 +81,20 @@ html[data-kn-core] [data-core-loading] {
     transform: rotate(360deg);
   }
 }
+@keyframes kn-core-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .kn-core-spinner-rotor {
-    animation: none !important;
+  .kn-core-spinner-layer {
+    animation: kn-core-breathe 1.8s ease-in-out infinite;
   }
 }
 @media (forced-colors: active) {
@@ -88,4 +105,84 @@ html[data-kn-core] [data-core-loading] {
     opacity: 1;
     stroke: GrayText;
   }
+}
+html[data-kn-core] .kn-core-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--kn-bg);
+  color: var(--kn-text);
+  gap: 20px;
+}
+html[data-kn-core] .kn-core-loading-topbar[hidden] {
+  display: block !important;
+  opacity: 0;
+  pointer-events: none;
+}
+html[data-kn-core] .kn-core-loading-topbar {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 2147483601;
+  will-change: opacity;
+  transform: translateZ(0);
+  width: 100%;
+  height: 2px;
+  pointer-events: none;
+  overflow: hidden;
+}
+html[data-kn-core] .kn-core-loading-topbar > .kn-core-loading-runner {
+  display: block;
+  will-change: transform;
+  width: 35%;
+  height: 100%;
+  background: var(--kn-accent);
+  animation: kn-core-progress 1.3s ease-in-out infinite;
+}
+.kn-core-inline-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kn-core-inline-progress .kn-core-spinner {
+  width: 28px;
+  height: 28px;
+}
+@keyframes kn-core-progress {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(390%, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-kn-core] .kn-core-loading-topbar > .kn-core-loading-runner {
+    animation: none;
+    width: 100%;
+    opacity: 0.7;
+  }
+}
+html[data-core-scroll-state="custom"]
+  :is(#sidebar, [data-core-sidebar], .kn-core-sidebar-scroll) {
+  scrollbar-width: none;
+}
+html[data-core-scroll-state="custom"]
+  :is(
+    #sidebar,
+    [data-core-sidebar],
+    .kn-core-sidebar-scroll
+  )::-webkit-scrollbar {
+  display: none;
+}
+
+/* Keep the compositor orbit alive before a native document handoff. */
+html[data-kn-core] .kn-core-loading[hidden] {
+  display: flex !important;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }

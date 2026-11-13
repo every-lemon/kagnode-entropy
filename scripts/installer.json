@@ -1,0 +1,67 @@
+{
+  "platforms": [
+    [
+      "ubuntu",
+      "24.04"
+    ],
+    [
+      "debian",
+      "12"
+    ],
+    [
+      "debian",
+      "13"
+    ]
+  ],
+  "architectures": [
+    "x86_64",
+    "aarch64"
+  ],
+  "required_paths": [
+    "data"
+  ],
+  "dependencies": [
+    "systemctl",
+    "python3",
+    "cargo",
+    "rustc",
+    "cc",
+    "useradd",
+    "runuser"
+  ],
+  "warnings": [
+    "Only the listed application or native setup is performed. Existing data is never reset.",
+    "Setup requires local administrator review; source/data package installation alone does not start services."
+  ],
+  "kind": "application",
+  "user": "kagnode-entropy",
+  "fields": [
+    {
+      "key": "port",
+      "label": "Loopback service port",
+      "type": "integer",
+      "required": false,
+      "secret": false,
+      "default": 8098
+    }
+  ],
+  "paths": {
+    "code": "/opt/kagnode/entropy",
+    "configuration": "/etc/kagnode/entropy.env",
+    "data": "/var/lib/kagnode/entropy",
+    "unit": "/etc/systemd/system/kagnode-entropy.service"
+  },
+  "units": [
+    "kagnode-entropy"
+  ],
+  "health_path": "/health",
+  "health_key": "trusted_execution",
+  "health_scope": "Loopback OS-backed service health. No video fetch, decoder, enclave, hardware or entropy-quality qualification.",
+  "changes": [
+    "Build the reviewed Rust source with Cargo.lock",
+    "Create a dedicated service identity and new private administrator credential directory",
+    "Start the loopback OS-backed service with no supplemental sources or audit enabled"
+  ],
+  "project": "entropy",
+  "version": "5.0.2"
+}

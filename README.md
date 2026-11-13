@@ -10,11 +10,13 @@ The locally served web interface provides a client API explorer and a separate a
 
 ## Release status
 
-**5.0.1** is the coordinated stable source patch, adding same-tab KagNode sign-in. Linux · AGPL-3.0-only.
+**5.0.2** is the coordinated stable source patch, updating shared controls and adding an explicit reviewed local installer. Linux · AGPL-3.0-only.
 
 Stable scope is the OS-backed local service, its API and administration. Supplemental-input experiments remain explicitly experimental. Video/decoder, enclave and hardware qualification are outside this release. No entropy-source assessment, cryptographic certification or compromised-host protection is claimed.
 
 ## Features
+
+Core 5.0.6 supplies the shared controls and account-photo presentation. This embedded service has no automatic UI update manager and reports update summaries as unavailable. Its reviewed installer builds and starts only the local OS-backed service.
 
 - OS CSPRNG output, bounded atomic batches, per-client quotas and source-failure handling.
 - Private persistent client credential hashes, one-time token display, rotation and revocation.
@@ -91,6 +93,8 @@ python3 tests/browser_admin.py
 Tests use fictional accounts, deterministic RNGs, mocked issuer responses and isolated temporary directories. Decoder fixtures do not run real FFmpeg or fetch live media. See [validation scope](docs/VALIDATION.md).
 
 ## Documentation
+
+- [Reviewed local setup](docs/INSTALLER.md)
 
 [Administration and account linking](docs/ADMINISTRATION.md) · [API](docs/API.md) · [Engine design](docs/DESIGN.md) · [Audit](docs/HARDENING.md) · [Experimental video](docs/VIDEO.md) · [Threat model](docs/THREAT-MODEL.md) · [TEE research](docs/TEE.md)
 

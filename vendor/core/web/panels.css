@@ -1,0 +1,100 @@
+/*! KagNode Core — segmented panels and restrained dialog surfaces. */
+html[data-kn-core] .kn-core-segments {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  isolation: isolate;
+  background: var(--kn-panel);
+  border: 1px solid var(--kn-line);
+  border-radius: 8px;
+  scrollbar-width: none;
+}
+html[data-kn-core] .kn-core-segments::-webkit-scrollbar {
+  display: none;
+}
+html[data-kn-core] .kn-core-segments [data-core-segment] {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border: 0;
+  border-radius: 5px;
+  padding: 6px 14px;
+  color: var(--kn-muted);
+  background: transparent;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+}
+html[data-kn-core] .kn-core-segments [data-active="true"] {
+  color: var(--kn-text);
+}
+html[data-kn-core] .kn-core-segment-indicator {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: 5px;
+  background: var(--kn-bg);
+  box-shadow: 0 1px 3px #0001;
+  transition:
+    transform 180ms ease,
+    width 180ms ease,
+    height 180ms ease;
+}
+html[data-kn-core] [data-core-panel][hidden] {
+  display: none !important;
+}
+html[data-kn-core] .kn-core-dialog {
+  box-sizing: border-box;
+  width: min(540px, calc(100% - 32px));
+  max-height: calc(100svh - 32px);
+  overflow: auto;
+  border: 1px solid var(--kn-line);
+  border-radius: 12px;
+  padding: 24px;
+  color: var(--kn-text);
+  background: var(--kn-bg);
+}
+html[data-kn-core] .kn-core-dialog::backdrop {
+  background: #0007;
+  backdrop-filter: blur(3px);
+}
+html[data-kn-core] [data-core-avatar],
+html[data-kn-core] .avatar,
+html[data-kn-core] .avatar img,
+html[data-kn-core] [data-core-account-trigger] img {
+  border-radius: 50% !important;
+  object-fit: cover;
+  aspect-ratio: 1;
+}
+html[data-kn-core] [data-core-account-trigger] {
+  flex: none;
+  overflow: hidden;
+}
+@media (max-width: 700px) {
+  html[data-kn-core] dialog[data-core-sheet] {
+    position: fixed;
+    inset: auto 0 0;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 85svh;
+    padding: 24px 20px max(24px, env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-kn-core] .kn-core-segment-indicator {
+    transition: none;
+  }
+}

@@ -121,6 +121,8 @@ try:
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert page.evaluate(
                 "localStorage.length === 0 && sessionStorage.length === 0"
+            ), page.evaluate(
+                "({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})"
             )
             assert not errors, errors
             page.screenshot(path=str(ARTIFACTS / f"{name}.png"), full_page=True)

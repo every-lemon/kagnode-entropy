@@ -288,7 +288,7 @@
         ),
       );
     panel
-      .querySelectorAll("[data-core-scroll-mode]")
+      .querySelectorAll("button[data-core-scroll-mode]")
       .forEach((b) =>
         b.setAttribute(
           "aria-pressed",
@@ -355,7 +355,7 @@
   }
   document.addEventListener("click", (e) => {
     const target = e.target.closest(
-      "[data-core-theme],[data-core-appearance-connect],[data-core-appearance-disconnect],[data-core-scroll-mode]",
+      "[data-core-theme],[data-core-appearance-connect],[data-core-appearance-disconnect],button[data-core-scroll-mode]",
     );
     if (!target) return;
     if (target.dataset.coreTheme) choose(target.dataset.coreTheme);

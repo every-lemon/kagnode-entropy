@@ -65,9 +65,11 @@ with tempfile.TemporaryDirectory(prefix="entropy-admin-browser-") as temporary:
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.on(
                     "request",
-                    lambda request: external.append(request.url)
-                    if not request.url.startswith(f"http://127.0.0.1:{port}/")
-                    else None,
+                    lambda request: (
+                        external.append(request.url)
+                        if not request.url.startswith(f"http://127.0.0.1:{port}/")
+                        else None
+                    ),
                 )
                 held = []
 

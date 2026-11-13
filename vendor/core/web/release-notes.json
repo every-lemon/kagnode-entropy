@@ -1,0 +1,8 @@
+{
+  "title": "More reliable Core management",
+  "items": [
+    "Background component status checks stop safely during reload and navigation.",
+    "Interrupted update actions are never replayed automatically.",
+    "Status refreshes resume without opening unexpected sign-in prompts."
+  ]
+}

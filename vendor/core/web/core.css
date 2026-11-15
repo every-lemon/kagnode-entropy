@@ -25,8 +25,11 @@ html[data-theme="dark"] {
   --kn-muted: #a3a3aa;
 }
 html[data-kn-core] {
-  color-scheme: light dark;
+  color-scheme: light;
   scroll-padding-top: 100px;
+}
+html[data-kn-core][data-theme="dark"] {
+  color-scheme: dark;
 }
 html[data-kn-core][data-core-collapsed="true"] {
   --kn-sidebar-size: 57px;
@@ -277,7 +280,7 @@ html[data-kn-core]
   transition: transform 180ms;
 }
 .kn-core-nav-group[open] > summary > .chevron {
-  transform: rotate(90deg);
+  transform: rotate(180deg);
 }
 html[data-kn-core] .kn-core-nav-group > .submenu {
   position: static !important;
@@ -361,6 +364,43 @@ html[data-kn-core][data-core-collapsed="true"]
   gap: 12px !important;
   white-space: nowrap;
   font-size: 0 !important;
+}
+@media (min-width: 1024px) {
+  html[data-kn-core][data-core-collapsed="true"]
+    .sidebar[data-core-sidebar]
+    :is([data-core-search-open], [data-command], .quick-search) {
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    height: 38px !important;
+    margin-inline: 0 !important;
+    padding: 9px !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+  }
+  html[data-kn-core][data-core-collapsed="true"]
+    .sidebar[data-core-sidebar]
+    :is([data-core-search-open], [data-command], .quick-search)
+    > :not(svg):not(.ui-icon):not(.icon):not([data-core-icon]):not(
+      [data-icon]
+    ) {
+    display: none !important;
+  }
+  html[data-kn-core][data-core-collapsed="true"]
+    .sidebar[data-core-sidebar]
+    :is([data-core-search-open], [data-command], .quick-search)
+    svg {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    flex: none !important;
+    margin: 0 !important;
+  }
 }
 [data-core-collapsed="true"]
   .kn-core-sidebar-navigation
@@ -876,6 +916,9 @@ html[data-kn-core][data-core-collapsed="true"]
   height: 38px;
   padding: 9px;
   gap: 0;
+  font-size: 0;
+  justify-content: center;
+  overflow: hidden;
 }
 html[data-kn-core][data-core-collapsed="true"]
   .kn-core-sidebar-navigation
@@ -902,4 +945,26 @@ html[data-kn-core]
   ) {
   border-radius: 50% !important;
   object-fit: cover;
+}
+
+/* Normalize disclosure motion even when markup comes from an older server adapter. */
+html[data-kn-core] [data-disclosure-icon] {
+  transform: none;
+  transition: transform 180ms var(--kn-easing);
+}
+html[data-kn-core]
+  :is(details[open] > summary, [aria-expanded="true"])
+  > [data-disclosure-icon] {
+  transform: rotate(180deg);
+}
+html[data-kn-core] summary .chevron:has([data-disclosure-icon]) {
+  transform: none !important;
+}
+html[data-kn-core] details[open] > summary .chevron [data-disclosure-icon] {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-kn-core] [data-disclosure-icon] {
+    transition: none;
+  }
 }

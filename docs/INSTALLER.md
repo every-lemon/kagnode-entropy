@@ -1,6 +1,6 @@
 # Reviewed local setup
 
-Source/data packages remain inert: they do not run this installer, initialize accounts, migrate data or start services. The KagNode CLI calls this project-owned entrypoint only after displaying a fresh plan for explicit local review:
+Source/data packages remain inert: they do not run this installer, initialize accounts, migrate data or start services. The KagNode Daemon calls this project-owned entrypoint only after displaying a fresh plan for explicit local review:
 
 ```text
 python3 scripts/kagnode-installer.py plan|apply|status|health|recover --request PRIVATE_REQUEST --output NEW_PRIVATE_OUTPUT

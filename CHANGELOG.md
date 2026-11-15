@@ -1,3 +1,9 @@
+# 5.0.3
+
+- Adopt verified KagNode Core 5.0.14 for shared navigation, search, disclosure, dialog and progressive sign-in repairs.
+- Use KagNode Daemon in current management instructions and updater presentation; retain existing command, package and data identities.
+- Preserve native services and user data. Hardware, native HA and media processing qualification are unchanged.
+
 # 5.0.2
 
 - Updated the reviewed Core interface and account-scoped update notice integration where supported.

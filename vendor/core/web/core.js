@@ -146,13 +146,37 @@
     const folders = all("[data-core-nav-folder]", sidebar);
     if (!container || !folders.length) return;
     sidebar.dataset.coreFoldersReady = "true";
-    let opener;
+    let opener,
+      current = container,
+      motion;
+    const positions = new WeakMap();
     function show(name, focus = false) {
       const folder = folders.find((el) => el.dataset.coreNavFolder === name);
+      const next = folder || container;
+      const scroller = container.closest(".kn-core-sidebar-navigation");
+      positions.set(current, scroller?.scrollTop || 0);
+      motion?.cancel();
       container.hidden = !!folder;
       folders.forEach((el) => {
         el.hidden = el !== folder;
       });
+      if (scroller) scroller.scrollTop = positions.get(next) || 0;
+      if (
+        focus &&
+        next !== current &&
+        next.animate &&
+        !matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
+        const direction = folder ? 1 : -1;
+        motion = next.animate(
+          [
+            { opacity: 0, transform: `translateX(${direction * 24}px)` },
+            { opacity: 1, transform: "translateX(0)" },
+          ],
+          { duration: 220, easing: "cubic-bezier(.2,.7,.2,1)" },
+        );
+      }
+      current = next;
       all("[data-core-nav-open]", sidebar).forEach((button) => {
         button.setAttribute(
           "aria-expanded",
@@ -191,8 +215,15 @@
       getComputedStyle(sidebar).display !== "none";
     const state = visible ? "active" : "inactive";
     if (root.dataset.coreShell !== state) {
+      // Adopting a newly visible legacy layout may change auto width to a
+      // calculated width. Do not animate only its old margin in that frame.
+      delete root.dataset.coreReady;
       root.dataset.coreShell = state;
-      requestAnimationFrame(() => window.KagNodeScroll?.refresh());
+      void document.body.offsetWidth;
+      requestAnimationFrame(() => {
+        if (root.dataset.coreShell === state) root.dataset.coreReady = "true";
+        window.KagNodeScroll?.refresh();
+      });
     }
   }
   function setCollapsed(value, persist = true) {
@@ -500,6 +531,18 @@
       "</svg>"
     );
   }
+  function normalizeDisclosure(svg) {
+    const shape = window.KagNodeIcons.chevron;
+    const path = shape.match(/\bd="([^"]+)"/)?.[1];
+    if (
+      svg.childElementCount !== 1 ||
+      svg.firstElementChild?.localName !== "path" ||
+      svg.firstElementChild.getAttribute("d") !== path
+    )
+      svg.innerHTML = shape;
+    if (!svg.hasAttribute("data-disclosure-icon"))
+      svg.dataset.disclosureIcon = "";
+  }
   function normalize() {
     for (const host of all("[data-core-icon]")) {
       const name = host.dataset.coreIcon;
@@ -604,6 +647,26 @@
       b.setAttribute("aria-label", "Open account menu");
       b.setAttribute("aria-haspopup", "true");
     });
+    for (const icon of all(
+      'svg[data-disclosure-icon],svg[data-core-icon-name="chevron"]',
+    )) {
+      normalizeDisclosure(icon);
+    }
+    if (sidebar) {
+      for (const button of all("[data-command]", sidebar)) {
+        button.setAttribute("aria-label", "Quick search");
+        button.dataset.coreTooltip = "Quick search";
+      }
+      for (const disclosure of all(
+        "summary .chevron, [data-disclosure-icon]",
+        sidebar,
+      )) {
+        const svg = disclosure.matches("svg")
+          ? disclosure
+          : disclosure.querySelector("svg");
+        if (svg) normalizeDisclosure(svg);
+      }
+    }
     if (sidebar)
       for (const link of all(
         ".kn-core-sidebar-navigation a,.kn-core-sidebar-navigation summary",

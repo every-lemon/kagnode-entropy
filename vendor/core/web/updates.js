@@ -253,6 +253,39 @@
       };
       actions.append(b);
     }
+    if (current.capabilities?.release_channels) {
+      const label = el("label", "Release channel"),
+        select = el("select");
+      select.setAttribute("aria-label", "Core release channel");
+      for (const [value, text] of [
+        ["stable", "Stable"],
+        ["beta", "Beta"],
+      ]) {
+        const option = el("option", text);
+        option.value = value;
+        select.append(option);
+      }
+      select.value = current.channel || "stable";
+      select.addEventListener("change", async () => {
+        const previous = current.channel || "stable";
+        abortRead();
+        const epoch = generation;
+        select.disabled = true;
+        try {
+          const result = await request("policy", { channel: select.value });
+          if (epoch !== generation || navigating) return;
+          current = result;
+          render();
+        } catch (error) {
+          select.value = previous;
+          status.textContent = error.message;
+        } finally {
+          select.disabled = false;
+        }
+      });
+      label.append(select);
+      actions.append(label);
+    }
     button("Check for updates", "check");
     if (candidate?.changed)
       button(

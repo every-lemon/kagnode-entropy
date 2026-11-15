@@ -16,6 +16,38 @@ use std::{
 };
 use tower::ServiceExt;
 struct Fixed;
+#[tokio::test]
+async fn shared_ui_upgrade_keeps_current_and_previous_signed_assets_available() {
+    use sha2::{Digest, Sha256};
+    let app = server::app(state());
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    for manifest_path in [
+        "vendor/core/core-manifest.json",
+        "vendor/core/previous/5.0.8/core-manifest.json",
+    ] {
+        let manifest: Value =
+            serde_json::from_slice(&std::fs::read(root.join(manifest_path)).unwrap()).unwrap();
+        let version = manifest["version"].as_str().unwrap();
+        for (name, record) in manifest["files"].as_object().unwrap() {
+            let response = app
+                .clone()
+                .oneshot(request(
+                    "GET",
+                    &format!("/kagnode-core/{version}/{name}"),
+                    None,
+                    None,
+                ))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let bytes = response.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(
+                hex::encode(Sha256::digest(&bytes)),
+                record["sha256"].as_str().unwrap()
+            );
+        }
+    }
+}
 impl RandomSource for Fixed {
     fn fill(&self, out: &mut [u8]) -> Result<(), &'static str> {
         out.fill(4);

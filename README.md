@@ -10,13 +10,13 @@ The locally served web interface provides a client API explorer and a separate a
 
 ## Release status
 
-**5.0.2** is the coordinated stable source patch, updating shared controls and adding an explicit reviewed local installer. Linux · AGPL-3.0-only.
+**5.0.3** is the coordinated stable source patch, updating shared controls and adding an explicit reviewed local installer. Linux · AGPL-3.0-only.
 
 Stable scope is the OS-backed local service, its API and administration. Supplemental-input experiments remain explicitly experimental. Video/decoder, enclave and hardware qualification are outside this release. No entropy-source assessment, cryptographic certification or compromised-host protection is claimed.
 
 ## Features
 
-Core 5.0.6 supplies the shared controls and account-photo presentation. This embedded service has no automatic UI update manager and reports update summaries as unavailable. Its reviewed installer builds and starts only the local OS-backed service.
+Core 5.0.14 supplies the shared controls and account-photo presentation. This embedded service has no automatic UI update manager and reports update summaries as unavailable. Its reviewed installer builds and starts only the local OS-backed service.
 
 - OS CSPRNG output, bounded atomic batches, per-client quotas and source-failure handling.
 - Private persistent client credential hashes, one-time token display, rotation and revocation.

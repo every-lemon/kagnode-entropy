@@ -324,6 +324,11 @@
     resumeReturn();
   }
   function reset(container = document) {
+    const forms = [
+      ...(container.matches?.("form") ? [container] : []),
+      ...(container.querySelectorAll?.("form") || []),
+    ];
+    for (const form of forms) progressive.get(form)?.reset();
     const buttons = [
       ...(container.matches?.("button[data-core-login-provider]")
         ? [container]
@@ -515,6 +520,10 @@
         false,
       );
       state.show = show;
+      state.reset = () => {
+        secret.value = "";
+        show("identity", false);
+      };
       state.advance = advance;
       state.sync = () => {
         value.textContent = identity.value;

@@ -178,7 +178,7 @@
     input.setAttribute("aria-expanded", "true");
     input.setAttribute("aria-autocomplete", "list");
     label.htmlFor = input.id;
-    const close = element("button", "kn-core-search-close", "Esc");
+    const close = element("button", "kn-core-search-close", "×");
     close.type = "button";
     close.setAttribute("aria-label", "Close quick search");
     close.addEventListener("click", () => dialog.close());

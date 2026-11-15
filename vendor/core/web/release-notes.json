@@ -1,8 +1,8 @@
 {
-  "title": "More reliable Core management",
+  "title": "Clearer navigation and movable dialogs",
   "items": [
-    "Background component status checks stop safely during reload and navigation.",
-    "Interrupted update actions are never replayed automatically.",
-    "Status refreshes resume without opening unexpected sign-in prompts."
+    "Collapsed Quick Search stays centered inside the sidebar.",
+    "Dialog forms have an accessible close control, viewport-bounded desktop dragging and unsaved-change confirmation.",
+    "Disclosure carets point down and animate upward when expanded."
   ]
 }

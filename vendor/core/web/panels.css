@@ -69,6 +69,38 @@ html[data-kn-core] .kn-core-dialog::backdrop {
   background: #0007;
   backdrop-filter: blur(3px);
 }
+html[data-kn-core] .kn-core-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  cursor: move;
+  touch-action: none;
+}
+html[data-kn-core] .kn-core-dialog-header :is(h1, h2, h3) {
+  margin: 0;
+}
+html[data-kn-core] .kn-core-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--kn-line);
+  background: var(--kn-panel);
+  color: var(--kn-text);
+  font: inherit;
+  font-size: 24px;
+  cursor: pointer;
+}
+@media (max-width: 699px) {
+  html[data-kn-core] .kn-core-dialog-header {
+    cursor: default;
+    touch-action: auto;
+  }
+}
 html[data-kn-core] [data-core-avatar],
 html[data-kn-core] .avatar,
 html[data-kn-core] .avatar img,

@@ -568,6 +568,8 @@
       if (el.tagName === "SELECT") select(el);
       else if (el.type === "number") number(el);
       else if (["date", "datetime-local"].includes(el.type)) date(el);
+      else if (el.type === "checkbox" && el.hasAttribute("data-core-switch"))
+        el.setAttribute("role", "switch");
       el.addEventListener("invalid", (e) => {
         e.preventDefault();
         errors(el);

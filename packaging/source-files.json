@@ -21,6 +21,8 @@
   "docs/THREAT-MODEL.md",
   "docs/VALIDATION.md",
   "docs/VIDEO.md",
+  "docs/images/preview-desktop.png",
+  "docs/images/preview-mobile.png",
   "packaging/release.json",
   "packaging/source-files.json",
   "requirements-format.txt",

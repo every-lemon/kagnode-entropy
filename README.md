@@ -8,6 +8,23 @@ KagNode Entropy distributes bounded, unchanged 64-byte blocks from the OS crypto
 
 The locally served web interface provides a client API explorer and a separate administrator console. KagNode Core supplies the login frame, sidebar, icons, controls and scrolling. Browsers never fetch Core assets from GitHub.
 
+### What it looks like
+
+Screenshots come from the local source preview. Its inputs are synthetic and its counters are fictional.
+
+| Desktop                                                                                                                 | Phone                                                           |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| ![The preview page showing the pool, the three-input pipeline and a client allocation](docs/images/preview-desktop.png) | ![The same page at phone width](docs/images/preview-mobile.png) |
+
+### How it works
+
+1. **Three inputs.** The pipeline takes raw pixel bytes, timestamps and counter bytes. In this preview the pixels are a fixed fixture and the counters are fictional.
+2. **Mixing.** The three inputs pass through three HMAC-SHA-512 stages. Separate HKDF labels derive the next key and the queued material.
+3. **A queue of chunks.** Finished chunks wait in a locked queue and each one is handed out once. A lost response burns its chunk, so a retry gets a new one.
+4. **Bound to the caller.** An authenticated client identity is part of the derivation, and each client has its own rate limit.
+5. **Two modes.** The default OS-backed mode adds fresh operating-system randomness to every generation. Experimental mode leaves that out and needs an explicit acknowledgement.
+6. **What it does not claim.** No entropy estimate is assigned to video, timing or network input. For ordinary application secrets, use the operating system's random generator directly; this composition has not had independent cryptographic review.
+
 ## Release status
 
 **5.0.3** is the coordinated stable source patch, updating shared controls and adding an explicit reviewed local installer. Linux · AGPL-3.0-only.
@@ -34,11 +51,11 @@ The service deliberately listens only on loopback. Run browser administration on
 
 ## Installation and downloads
 
-| Download | Contents | Platform |
-| --- | --- | --- |
-| Source `.tar.xz`, `.tar.gz`, `.zip` | Complete allowlisted source, embedded UI and instructions | Build on supported Linux |
-| Source `.deb` | Source/documentation under `/usr/share/kagnode/kagnode-entropy-source` | Architecture-independent; no service activation |
-| Source `.rpm` | Same source/documentation | Rocky Linux 10 package-installation scope; no native provisioning |
+| Download                            | Contents                                                               | Platform                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Source `.tar.xz`, `.tar.gz`, `.zip` | Complete allowlisted source, embedded UI and instructions              | Build on supported Linux                                          |
+| Source `.deb`                       | Source/documentation under `/usr/share/kagnode/kagnode-entropy-source` | Architecture-independent; no service activation                   |
+| Source `.rpm`                       | Same source/documentation                                              | Rocky Linux 10 package-installation scope; no native provisioning |
 
 Verify `SHA256SUMS` and `release-manifest.json` from the release. Source packages do not install a runnable daemon or reconfigure an existing host.
 

@@ -1,4 +1,4 @@
-<p align="center"><a href="#brand-artwork"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" alt="KagNode. Entropy"></picture></a></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="static/brand/entropy-lockup-dark.svg"><img src="static/brand/entropy-lockup-light.svg" width="304" alt="KagNode. Entropy"></picture></p>
 <h1 align="center">KagNode Entropy</h1>
 <p align="center">A local Rust service for operating-system cryptographic randomness.</p>
 
